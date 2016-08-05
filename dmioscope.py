@@ -249,7 +249,7 @@ class IOHistogram(object):
 
         counts_per_char = int(math.ceil(labels[-1] / float(chars)))
 
-        print(axis_labels)            
+        print(axis_labels)
         header = (1 + x_label_width) * " " + axis + chars * hbar
         print(header)
         for _bin in self.bins:
@@ -267,9 +267,10 @@ class IOHistogram(object):
         print("50%% of IO reaches %f%% of disk." % self.io_distribution(50.0))
         print("")
 
+
 def _get_cmd_output(cmd,stderr=False):
     args = shlex.split(cmd)
-    print(cmd)
+    log_verbose("_get_cmd_output('%s')" % cmd)
     try:
         p = Popen(args, shell=False, stdout=PIPE,
                   stderr=STDOUT if stderr else PIPE,
@@ -313,7 +314,7 @@ def main(args):
         time.sleep(interval)
 
         out = _get_cmd_output(_dm_report_cmd + _dm_report_fields)
-        print(out)
+        log_verbose(out)
         ioh.populate(out)
         ioh_cum.update(out)
         ioh.print_histogram(columns=80)
