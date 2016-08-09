@@ -115,6 +115,25 @@ class IOHistogram(object):
     nr_bins = 0
     dev_size = 0
     bins = None
+    totals = None
+
+    def _init_bins(self, bounds):
+        start = 0
+        nr_bins = 0
+        self.bins = []
+        self.totals = []
+        for val in bounds:
+            _bin = Bin(start, val - start)
+            self.bins.append(_bin)
+            _bin = Bin(start, val - start)
+            self.totals.append(_bin)
+            log_info("Initialised bin @ %d width %d"
+                     % (start, (val - start)))
+            start = val
+            nr_bins += 1
+        self.dev_size = start
+        self.nr_bins = nr_bins
+        return nr_bins
 
     def __init__(self, bounds, counter):
         """ Initialise an IOHistogram using the sector boundaries listed
@@ -134,26 +153,16 @@ class IOHistogram(object):
             Will create a histogram with four bins from 0..1M, 1M..2M,
             2M..3M, and 3M..4M, tracking the READ_COUNT counter.
         """
-        start = 0
-        nr_bins = 0
-        self.bins = []
-        for val in bounds:
-            _bin = Bin(start, val - start)
-            self.bins.append(_bin)
-            log_info("Initialised bin @ %d width %d"
-                     % (start, (val - start)))
-            start = val
-            nr_bins += 1
-        self.dev_size = start
-        self.nr_bins = nr_bins
+        nr_bins = self._init_bins(bounds)
+        self.counter = counter
         log_info("Initialised %s histogram with %d bins."
                  % (_counters[counter], nr_bins))
 
-    def _parse_data(self, data, update):
+    def update(self, data):
         """ Populate or update the histogram using the string counter
-            values in data. If update is non-zero counter values will
-            not be reset and new values are summed to yield a
-            cumulative distribution.
+            values in data. The current value of the histogram is set
+            to the counter values in data and this is added to the
+            historical totals for the histogram.
         """
         _bin = 0
         # data contains one row per histogram bin
@@ -164,24 +173,20 @@ class IOHistogram(object):
                 log_error("Unexpected row in histogram data")
                 return False
 
-            if not update:
-                self.bins[_bin].count = 0
-
-            self.bins[_bin].count += int(counters[self.counter])
+            # FIXME for counter in counters.. sum
+            value = int(counters[self.counter])
+            self.bins[_bin].count = value
+            self.totals[_bin].count += value
             _bin += 1
 
-    def populate(self, data):
-        """ Populate the histogram using the string counter values in
-            data. Any existing counter values are discarded.
-        """
-        return self._parse_data(data, 0)
+    def _test_update(self):
+        data = ""
+        for i in xrange(self.nr_bins):
+            data += "%d:%d\n" % (i, i)
+        self.update(data)
 
-    def update(self, data):
-        """ Update the histogram using the string counter values in
-            data. Counter values are not reset and new values are
-            summed to yield a cumulative distribution.
-        """
-        return self._parse_data(data, 1)
+    def min_width(self):
+        return min([_bin.width for _bin in self.bins])
 
     def max_count(self):
         """ Return the maximum count value contained in any bin.
@@ -192,15 +197,38 @@ class IOHistogram(object):
                 max_count = _bin.count
         return max_count
 
-    def sum(self):
+    def max_freq(self, total=False):
+        """ Return the maximum frequency value contained in any bin.
+        """
+        max_freq = 0
+        min_width = self.min_width()
+
+        if total:
+            bins = self.totals
+        else:
+            bins = self.bins
+
+        for _bin in bins:
+            scale = _bin.width / min_width
+            freq = _bin.count / scale
+            if freq > max_freq:
+                max_freq = freq
+        return max_freq
+
+    def sum(self, total=False):
         """ Return the sum of all count values for all bins.
         """
         bin_sum = 0
-        for _bin in self.bins:
+        if total:
+            bins = self.totals
+        else:
+            bins = self.bins
+
+        for _bin in bins:
             bin_sum += _bin.count
         return bin_sum
 
-    def io_distribution(self, percent):
+    def io_distribution(self, percent, total=False):
         """ Return the proportion of disk reached by the specified
             percentage of IO requests.
         """
@@ -208,7 +236,13 @@ class IOHistogram(object):
         total = 0
         count = float(self.sum())
         thresh = (count * percent) / 100.0
-        sorted_bins = sorted(self.bins, key=lambda b: b.count, reverse=True)
+
+        if total:
+            bins = self.totals
+        else:
+            bins = self.bins
+
+        sorted_bins = sorted(bins, key=lambda b: b.count, reverse=True)
 
         for _bin in sorted_bins:
             total += _bin.count
@@ -218,19 +252,19 @@ class IOHistogram(object):
 
         return ((100.0 * size) / self.dev_size)
 
-    def print_histogram(self, columns=80):
+    def print_histogram(self, columns=80, total=False):
         """ Print an ASCII representation of a histogram and its values,
             suitable for display on a terminal of at least 'colums'
             width.
         """
-        max_count = self.max_count()
-        hist_sum = self.sum()
+        max_freq = self.max_freq(total=total)
+        hist_sum = self.sum(total=total)
         x_label_width = 8
         vbar = "|"
         axis = "+"
         hbar = "-"
 
-        row_width = min([_bin.width for _bin in self.bins])
+        row_width = self.min_width()
 
         if not hist_sum:
             return None
@@ -238,26 +272,36 @@ class IOHistogram(object):
         prefix_width = x_label_width + len(vbar) + 2
         chars = columns - prefix_width
 
-        axis_labels = " " * (prefix_width - 1)
-        labels = label_value_axis(0, max_count, 5)
-        label_width = chars / (len(labels) - 1)
+        labels = label_value_axis(0, max_freq, 5)
+
+        axis_labels = " " * (prefix_width - len(str(labels[0])))
+        label_width = int(round(float(chars) / (len(labels) - 1)))
+        log_verbose("label_width=%d" % label_width)
         for label in labels:
             label_str = str(label)
             label_len = len(label_str)
             axis_labels += label_str
             axis_labels += (label_width - label_len) * " "
 
-        counts_per_char = int(math.ceil(labels[-1] / float(chars)))
+        counts_per_char = float(chars) / labels[-1]
 
+        if total:
+            bins = self.totals
+        else:
+            bins = self.bins
+
+        log_verbose([b.count for b in bins])
+        log_verbose("labels: %s" % labels)
+        log_verbose("chars=%d counts_per_char=%f" % (chars, counts_per_char))
         print(axis_labels)
         header = (1 + x_label_width) * " " + axis + chars * hbar
         print(header)
-        for _bin in self.bins:
+        for _bin in bins:
             scale = _bin.width / row_width
             label = _sizeof_fmt(_bin.start << 9)
             for step in xrange(scale):
                 row = label + (1 + (x_label_width - len(label))) * " " + vbar
-                row += (_bin.count / (scale * counts_per_char)) * "#"
+                row += int((_bin.count * counts_per_char) / scale) * "#"
                 print(row)
                 label = "" # only label 1st row
 
@@ -315,10 +359,14 @@ def main(args):
 
         out = _get_cmd_output(_dm_report_cmd + _dm_report_fields)
         log_verbose(out)
-        ioh.populate(out)
-        ioh_cum.update(out)
+        if _test:
+            ioh._test_update()
+        else:
+            ioh.update(out)
+        print("IO histogram")
         ioh.print_histogram(columns=80)
-        ioh_cum.print_histogram(columns=80)
+        print("Cumulative IO histogram")
+        ioh.print_histogram(columns=80, total=True)
 
 
 if __name__ == '__main__':
