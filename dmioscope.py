@@ -12,6 +12,8 @@ import os
 import errno
 import math
 import time
+import fcntl
+import struct
 
 _dm_report_fields = "read_count,write_count"
 _dm_report_cmd = "dmstats report --noheadings -o"
@@ -38,6 +40,24 @@ def log_verbose(str):
 def log_error(str):
     print(str, file=sys.stderr)
 
+def _device_sectors(dev_path):
+    """ Return device size in 512b sectors.
+    """
+    req = 0x80081272 # BLKGETSIZE64, result is bytes as uint64_t.
+    buf = ' ' * 8
+    fmt = 'L'
+
+    if os.path.sep in dev_path and not dev_path.startswith(os.path.sep):
+        # vg/lv name
+        dev_path = os.path.join("/dev", dev_path)
+    else:
+        # dm name
+        os.path.join("/dev/mapper", dev_path)
+
+    with open(dev_path) as dev:
+        buf = fcntl.ioctl(dev.fileno(), req, buf)
+    size_bytes = struct.unpack(fmt, buf)[0]
+    return size_bytes >> 9
 
 # Heckbert's Axis Labelling Algorithm ("nice numbers"), from:
 # "Graphics Gems", Paul S. Heckbert, 1988.
@@ -332,6 +352,14 @@ def _get_cmd_output(cmd,stderr=False):
 
     return stdout
 
+_initial_regions = 16
+
+def _create_bin_regions(dev, bounds):
+    start = 0
+    for bound in bounds:
+        out = _get_cmd_output("dmstats create --start %d --length %d %s"
+                              % (start, bound - start, dev))
+        start = bound
 
 def main(args):
     _dev = args[1]
@@ -339,20 +367,20 @@ def main(args):
 
     out = _get_cmd_output("dmstats delete --allregions %s" % _dev)
 
-    # Uniform 4GiB bins through a 32GiB device.
-    bounds = [
-        16777216, 25165824, 33554432,
-        41943040, 50331648, 58720256, 67108864
-    ]
+    _dev_size = _device_sectors(_dev)
 
+    if not _dev_size:
+        log_error("Found zero-sized device: %s" % _dev)
+        return 1
+
+    step = _dev_size / _initial_regions
+
+    bounds = [x for x in xrange(step, _dev_size + 1, step)]
+    print(bounds)
     ioh = IOHistogram(bounds, READ_COUNT);
     ioh_cum = IOHistogram(bounds, READ_COUNT);
 
-    start = 0
-    for bound in bounds:
-        out = _get_cmd_output("dmstats create --start %d --length %d %s"
-                              % (start, bound - start, _dev))
-        start = bound
+    _create_bin_regions(_dev, bounds)
 
     while True:
         time.sleep(interval)
