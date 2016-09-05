@@ -6,6 +6,7 @@
 from __future__ import print_function
 
 from subprocess import Popen, PIPE, STDOUT
+import argparse
 import shlex
 import sys
 import os
@@ -502,44 +503,66 @@ def _get_cmd_output(cmd,stderr=False):
 
     return stdout
 
-_initial_regions = 16
+# threshold at which to split a bin in two.
+_threshold = 5000
 
+def _parse_options(args):
+    parser = argparse.ArgumentParser(description="IOScope arguments.")
+    parser.add_argument("devices", metavar="dev", nargs="+",
+                        help="device to monitor.")
+    parser.add_argument("-c", "--current", action="store_true",
+                      dest="current", default=True,
+                      help="Show the current interval plot.")
+    parser.add_argument("-s", "--summary", action="store_true",
+                      dest="summary", default=False,
+                      help="Show the accumulated summary plot.")
+    parser.add_argument("-p", "--percent", action="store_true",
+                      dest="percent", default=False,
+                      help="Show distribution values as percentages.")
 
-def main(args):
-    _dev = args[1]
+    return parser.parse_args()
+
+_devices = []
+_histograms = []
+
+def _remove_all_regions():
+    for ioh in _histograms:
+        ioh.remove_bin_regions()
+
+def main(argv):
+    global _devices, _histograms
+
+    args = _parse_options(argv)
+    _devices = args.devices
+
     interval = 3
 
-    out = _get_cmd_output("dmstats delete --allregions %s" % _dev)
-
-    _dev_size = _device_sectors(_dev)
-
-    if not _dev_size:
-        log_error("Found zero-sized device: %s" % _dev)
-        return 1
-
-    step = _dev_size / _initial_regions
-
-    bounds = [x for x in xrange(step, _dev_size + 1, step)]
-    print(bounds)
-    ioh = IOHistogram(bounds, READ_COUNT);
-    ioh_cum = IOHistogram(bounds, READ_COUNT);
-
-    _create_bin_regions(_dev, bounds)
+    for dev in _devices:
+        out = _get_cmd_output("dmstats delete --allregions %s" % dev)
+        ioh = IOHistogram(dev, READ_COUNT);
+        ioh.create_bin_regions()
+        _histograms.append(ioh)
 
     while True:
+        for dev in _devices:
+            cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
+            out = _get_cmd_output(cmdstr % dev)
+            log_verbose(out)
+
+            ioh.update(out, test=_test)
+
+            if args.summary:
+                print("%s: accumulated IO distribution" % dev)
+                ioh.print_histogram(columns=160, render=RENDER_TOTALS)
+            if args.current:
+                print("%s: current IO distribution" % dev)
+                ioh.print_histogram(columns=160)
+
+            ioh.update_bin_regions()
+
         time.sleep(interval)
 
-        out = _get_cmd_output(_dm_report_cmd + _dm_report_fields)
-        log_verbose(out)
-        if _test:
-            ioh._test_update()
-        else:
-            ioh.update(out)
-        print("IO histogram")
-        ioh.print_histogram(columns=80)
-        print("Cumulative IO histogram")
-        ioh.print_histogram(columns=80, total=True)
-
+    _remove_all_regions()
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
