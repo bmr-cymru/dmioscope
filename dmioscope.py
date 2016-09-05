@@ -119,13 +119,23 @@ class Bin(object):
     start = 0
     width = 0
 
-    def __init__(self, start, width):
+    def __init__(self, start, width, count=0):
         self.start = start
         self.width = width
+        self.count = count
+
+    def bound(self):
+        """ Return the upper bound on this bin.
+        """
+        return self.start + self.width
 
     def split(self):
-        """ Split the count of this bin uniformly into two sub-bins """
-        return self.count / 2
+        """ Split the count of this bin uniformly in two.
+        """
+        self.count /= 2
+        self.width /= 2
+        return Bin(self.start + self.width, self.width, count=self.count)
+
 
 
 class IOHistogram(object):
