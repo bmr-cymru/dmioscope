@@ -98,9 +98,7 @@ def find_nice(x, round_val):
 
 def label_value_axis(minval, maxval, nticks):
     span = find_nice(maxval - minval, 0)
-    log_verbose("find_nice(%d, 1) = %d" % (maxval - minval, span))
     d = find_nice(span / (nticks - 1), 1)
-    log_verbose("find_nice(%d, 1) = %d" % (span / (nticks - 1), d))
     graphmin = math.floor(minval / d) * d
     graphmax = math.ceil(maxval / d) * d
     #nfrac = max(-math.floor(math.log10(d)), 0)
@@ -296,7 +294,6 @@ class IOHistogram(object):
 
         axis_labels = " " * (prefix_width - len(str(labels[0])))
         label_width = int(round(float(chars) / (len(labels) - 1)))
-        log_verbose("label_width=%d" % label_width)
         for label in labels:
             label_str = str(label)
             label_len = len(label_str)
