@@ -137,24 +137,36 @@ class Bin(object):
         return Bin(self.start + self.width, self.width, count=self.count)
 
 
+_min_size_fraction = 40
+
+# IOHistogram class constants
+RENDER_COUNTS = 1
+RENDER_TOTALS = 2
 
 class IOHistogram(object):
+
+    # IOHistogram instance variables
     counter = 0 # READ_COUNT
     nr_bins = 0
     dev_size = 0
+    device = None
+    bounds = None # current bounds set
+    regions = None # current region_ids
     bins = None
     totals = None
 
-    def _init_bins(self, bounds):
-        start = 0
-        nr_bins = 0
+    def _init_bins(self):
         self.bins = []
         self.totals = []
+        bounds = self.bounds
+
+        start = 0
+        nr_bins = 0
         for val in bounds:
             _bin = Bin(start, val - start)
             self.bins.append(_bin)
-            _bin = Bin(start, val - start)
-            self.totals.append(_bin)
+            _tot_bin = Bin(start, val - start)
+            self.totals.append(_tot_bin)
             log_info("Initialised bin @ %d width %d"
                      % (start, (val - start)))
             start = val
@@ -163,7 +175,21 @@ class IOHistogram(object):
         self.nr_bins = nr_bins
         return nr_bins
 
-    def __init__(self, bounds, counter):
+    def _make_bounds(self, nr_regions):
+        """ Make a list of evenly spaced bounds values spanning an
+            entire device.
+        """
+        if not self.dev_size:
+            log_error("Found zero-sized device: %s" % device)
+            return None
+
+        step = self.dev_size / nr_regions
+
+        bounds = [x for x in xrange(step, self.dev_size + 1, step)]
+        log_verbose(bounds)
+        return bounds
+
+    def __init__(self, device, counter, bounds):
         """ Initialise an IOHistogram using the sector boundaries listed
             in bins. Boundary values are given as an upper bound on the
             current bin, with an implicit lower bound of 0 on the first.
@@ -181,20 +207,57 @@ class IOHistogram(object):
             Will create a histogram with four bins from 0..1M, 1M..2M,
             2M..3M, and 3M..4M, tracking the READ_COUNT counter.
         """
-        nr_bins = self._init_bins(bounds)
-        self.counter = counter
-        log_info("Initialised %s histogram with %d bins."
-                 % (_counters[counter], nr_bins))
+        self.device = device
+        self.bounds = bounds
 
-    def update(self, data):
+        self.dev_size = _device_sectors(self.device)
+        self.min_size = self.dev_size / _min_size_fraction
+
+        nr_bins = self._init_bins()
+        self.counter = counter
+        log_info("Initialised %s histogram with %d bins, min_size=%d."
+                 % (_counters[counter], nr_bins, self.min_size))
+
+    def __init__(self, device, counter, initial_regions=1):
+        """ Initialise an IOHistogram with inital_regions bins evenly
+            spaced across the specified device.
+
+            All offsets are in 512b sectors.
+
+            The new histogram is bound to the counter field specified by
+            counter.
+
+            For e.g.:
+
+            ioh = IOHistogram([2048, 4096, 6144, 8192], READ_COUNT);
+
+            Will create a histogram with four bins from 0..1M, 1M..2M,
+            2M..3M, and 3M..4M, tracking the READ_COUNT counter.
+        """
+        self.device = device
+        self.dev_size = _device_sectors(self.device)
+        self.min_size = self.dev_size / _min_size_fraction
+        self.bounds = self._make_bounds(initial_regions)
+        print(self.bounds)
+        nr_bins = self._init_bins()
+        log_info("Initialised %s histogram with %d bins, min_size=%d."
+                 % (_counters[counter], nr_bins, self.min_size))
+
+    def update(self, data, test=False):
         """ Populate or update the histogram using the string counter
             values in data. The current value of the histogram is set
             to the counter values in data and this is added to the
             historical totals for the histogram.
         """
         _bin = 0
+        if test:
+            return self._test_update()
+
+        log_verbose(data.strip())
+
         # data contains one row per histogram bin
         for line in data.splitlines():
+            print("row: " + line)
             counters = line.split(":")
 
             if _bin > self.nr_bins:
@@ -261,8 +324,8 @@ class IOHistogram(object):
             percentage of IO requests.
         """
         size = 0
-        total = 0
-        count = float(self.sum())
+        count_sum = 0
+        count = float(self.sum(total=total))
         thresh = (count * percent) / 100.0
 
         if total:
@@ -273,20 +336,26 @@ class IOHistogram(object):
         sorted_bins = sorted(bins, key=lambda b: b.count, reverse=True)
 
         for _bin in sorted_bins:
-            total += _bin.count
+            count_sum += _bin.count
             size += _bin.width;
-            if (total > thresh):
+            if (count_sum > thresh):
                 break
 
         return ((100.0 * size) / self.dev_size)
 
-    def print_histogram(self, columns=80, total=False):
+    def print_histogram(self, columns=80, render=RENDER_COUNTS):
         """ Print an ASCII representation of a histogram and its values,
             suitable for display on a terminal of at least 'colums'
             width.
         """
-        max_freq = self.max_freq(total=total)
-        hist_sum = self.sum(total=total)
+
+        if render & RENDER_TOTALS:
+            max_freq = self.max_freq(total=True)
+            hist_sum = self.sum(total=True)
+        else:
+            max_freq = self.max_freq(total=False)
+            hist_sum = self.sum(total=False)
+
         x_label_width = 8
         vbar = "|"
         axis = "+"
@@ -312,31 +381,105 @@ class IOHistogram(object):
 
         counts_per_char = float(chars) / labels[-1]
 
-        if total:
-            bins = self.totals
+        # regions is a list of either a 1-tuples, or a 2-tuples containing the
+        # count and total bins for this region.
+        if render == RENDER_COUNTS:
+            regions = zip(self.bins)
+        elif render == RENDER_TOTALS:
+            regions = zip(self.totals)
         else:
-            bins = self.bins
+            regions = zip(self.bins, self.totals)
 
-        log_verbose([b.count for b in bins])
-        log_verbose("labels: %s" % labels)
-        log_verbose("chars=%d counts_per_char=%f" % (chars, counts_per_char))
         print(axis_labels)
         header = (1 + x_label_width) * " " + axis + chars * hbar
         print(header)
-        for _bin in bins:
+
+        for region in regions:
+            _bin = region[0]
+            if len(region) > 1:
+                # stacked count and totals render
+                _tot = region[1]
+            else:
+                # single count or totals render
+                _tot = None
+
             scale = _bin.width / row_width
             label = _sizeof_fmt(_bin.start << 9)
             for step in xrange(scale):
                 row = label + (1 + (x_label_width - len(label))) * " " + vbar
                 row += int((_bin.count * counts_per_char) / scale) * "#"
+                if _tot:
+                    # plot accumulated total over count
+                    count_diff = _tot.count - _bin.count
+                    row += int(((count_diff) * counts_per_char) / scale) * "@"
                 print(row)
                 label = "" # only label 1st row
 
-        print("95%% of IO reaches %f%% of disk." % self.io_distribution(95.0))
-        print("90%% of IO reaches %f%% of disk." % self.io_distribution(90.0))
-        print("75%% of IO reaches %f%% of disk." % self.io_distribution(75.0))
-        print("50%% of IO reaches %f%% of disk." % self.io_distribution(50.0))
+        # FIXME: command line option
+        #points = [50.0, 66.6, 75.0, 90.0, 95.0, 99.0]
+        points = [90.0]
+        for point in points:
+            print("%.2f%% of IO reaches %.2f%% of disk."
+                  % (point, self.io_distribution(point, total=False)))
         print("")
+
+    def update_bin_regions(self):
+        # zip bins, totals, and bounds into a tuple for splitting.
+        inbins = zip(self.bins, self.totals, self.bounds, self.regions)
+        outbins = []
+        min_split = self.min_size * 2
+        for inbin in inbins:
+            (_bin, _tot, bound, region) = inbin
+            if (_bin.count <= _threshold or _bin.width < min_split):
+                outbins.append(inbin)
+            else:
+                newbin = _bin.split()
+                newtot = _tot.split()
+
+                newbound = newbin.bound()
+                bound = _bin.bound()
+
+                self._remove_bin_region(region)
+
+                oldregion = self._create_bin_region(_bin.start, _bin.width)
+                newregion = self._create_bin_region(newbin.start, newbin.width)
+
+                outbins.append((_bin, _tot, bound, oldregion))
+                outbins.append((newbin, newtot, newbound, newregion))
+
+                self.nr_bins += 1
+
+        (_bins, _tots, bounds, regions) = zip(*outbins)
+
+        self.bins = list(_bins)
+        self.totals = list(_tots)
+        self.bounds = list(bounds)
+        self.regions = list(regions)
+
+    def _create_bin_region(self, start, length):
+        out = _get_cmd_output("dmstats create --start %d --length %d %s"
+                              % (start, length, self.device))
+
+        if not out:
+            return -1
+
+        return int(out.strip().split()[-1])
+
+    def create_bin_regions(self):
+        start = 0
+        regions = []
+        for bound in self.bounds:
+            regions.append(self._create_bin_region(start, bound - start))
+            start = bound
+        self.regions = regions
+
+    def _remove_bin_region(self, region_id):
+        dev_region = (region_id, self.device)
+        out = _get_cmd_output("dmstats delete --regionid %d %s" % dev_region)
+
+    def remove_bin_regions(self):
+        for region in self.regions:
+            self._remove_bin_region(region)
 
 
 def _get_cmd_output(cmd,stderr=False):
@@ -361,12 +504,6 @@ def _get_cmd_output(cmd,stderr=False):
 
 _initial_regions = 16
 
-def _create_bin_regions(dev, bounds):
-    start = 0
-    for bound in bounds:
-        out = _get_cmd_output("dmstats create --start %d --length %d %s"
-                              % (start, bound - start, dev))
-        start = bound
 
 def main(args):
     _dev = args[1]
