@@ -98,6 +98,8 @@ def find_nice(x, round_val):
     return nf * math.pow(10, expv)
 
 def label_value_axis(minval, maxval, nticks):
+    if not maxval:
+        maxval = nticks
     span = find_nice(maxval - minval, 0)
     d = find_nice(span / (nticks - 1), 1)
     graphmin = math.floor(minval / d) * d
@@ -377,9 +379,6 @@ class IOHistogram(object):
         hbar = "-"
 
         row_width = self.min_width()
-
-        if not hist_sum:
-            return None
 
         prefix_width = x_label_width + len(vbar) + 2
         chars = columns - prefix_width
