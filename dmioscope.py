@@ -556,7 +556,7 @@ def _parse_options(args):
 
     adaptp.add_argument("-n", "--no-adaptive", action="store_false",
                         dest="adaptive", help="Do not adapt the number of bins"
-                        "according to observed IO volume.")
+                        " according to observed IO volume.")
 
     parser.add_argument("-p", "--percent", action="store_true",
                         dest="percent", default=False,
