@@ -557,6 +557,9 @@ def main(argv):
 
     while count:
         for dev in _devices:
+            # Sleep at the top of the interval to accumulate some initial
+            # data to display.
+            time.sleep(interval)
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
             out = _get_cmd_output(cmdstr % dev)
             log_verbose(out)
@@ -572,8 +575,7 @@ def main(argv):
 
             ioh.update_bin_regions()
 
-        time.sleep(interval)
-        count -= 1
+            count -= 1
 
     _remove_all_regions()
 
