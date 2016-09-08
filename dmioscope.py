@@ -509,7 +509,8 @@ _threshold = 5000
 def _parse_options(args):
     parser = argparse.ArgumentParser(description="IOScope arguments.")
     parser.add_argument("devices", metavar="dev", nargs="+",
-                        help="device to monitor.")
+                        help="Device(s) to monitor.")
+
     parser.add_argument("-c", "--current", action="store_true",
                       dest="current", default=True,
                       help="Show the current interval plot.")
