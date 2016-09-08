@@ -306,7 +306,7 @@ class IOHistogram(object):
     def max_freq(self, total=False):
         """ Return the maximum frequency value contained in any bin.
         """
-        max_freq = 0
+        max_freq = 0.0
         min_width = self.min_width()
 
         if total:
@@ -316,7 +316,7 @@ class IOHistogram(object):
 
         for _bin in bins:
             scale = _bin.width / min_width
-            freq = _bin.count / scale
+            freq = float(_bin.count) / scale
             if freq > max_freq:
                 max_freq = freq
         return max_freq
