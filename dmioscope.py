@@ -566,6 +566,10 @@ def _parse_options(args):
                         dest="summary", default=False,
                         help="Show the accumulated summary plot.")
 
+    parser.add_argument("-t", "--threshold", action="store", type=int,
+                        dest="thresh", default = 5000, help="Threshold at "
+                        "which to split a bin when using --adaptive")
+
     return parser.parse_args()
 
 _devices = []
@@ -576,13 +580,14 @@ def _remove_all_regions():
         ioh.remove_bin_regions()
 
 def main(argv):
-    global _devices, _histograms
+    global _devices, _histograms, _threshold
 
     args = _parse_options(argv)
 
     interval = args.interval
     count = args.count
     _devices = args.devices
+    _threshold = args.thresh
 
     adapt = args.adaptive
     nr_bins = args.bins
