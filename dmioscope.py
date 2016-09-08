@@ -630,12 +630,12 @@ def main(argv):
     _remove_all_regions()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2:
-        log_error("%s: missing file argument." % sys.argv[0])
-        sys.exit(1)
     try:
-        main(sys.argv[1:])
+        status = main(sys.argv[1:])
     except KeyboardInterrupt:
         _remove_all_regions()
+        status = 0
+
+    sys.exit(status)
 
 # vim: set et ts=4 sw=4 :
