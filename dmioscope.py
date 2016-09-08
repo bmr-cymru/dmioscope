@@ -546,7 +546,7 @@ def _parse_options(args):
                         help="Adapt the number of bins to observed IO volume.")
 
     parser.add_argument("-b", "--bins", action="store", type=int,
-                        dest="bins", metavar="nr", default=1,
+                        dest="bins", metavar="NR_BINS", default=1,
                         help="Divide devices into nr equally sized bins.")
 
     parser.add_argument("-c", "--current", action="store_true",
