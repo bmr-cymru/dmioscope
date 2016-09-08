@@ -508,21 +508,28 @@ _threshold = 5000
 
 def _parse_options(args):
     parser = argparse.ArgumentParser(description="IOScope arguments.")
+
+    parser.add_argument("interval", metavar="interval", nargs="?", default=5,
+                        help="Duration of the report interval in seconds.",
+                        type=float)
+
+    parser.add_argument("count", metavar="count", nargs="?", default=1,
+                        help="Number of intervals to report.", type=int)
+
     parser.add_argument("devices", metavar="dev", nargs="+",
                         help="Device(s) to monitor.")
 
     parser.add_argument("-c", "--current", action="store_true",
-                      dest="current", default=True,
-                      help="Show the current interval plot.")
+                        dest="current", default=True,
+                        help="Show the current interval plot.")
+
     parser.add_argument("-s", "--summary", action="store_true",
-                      dest="summary", default=False,
-                      help="Show the accumulated summary plot.")
+                        dest="summary", default=False,
+                        help="Show the accumulated summary plot.")
+
     parser.add_argument("-p", "--percent", action="store_true",
-                      dest="percent", default=False,
-                      help="Show distribution values as percentages.")
-    parser.add_argument("-i", "--interval", action="store", type=int,
-                        help="Interval to wait inbetween reports.",
-                        dest="interval", default="3")
+                        dest="percent", default=False,
+                        help="Show distribution values as percentages.")
 
     return parser.parse_args()
 
@@ -537,9 +544,10 @@ def main(argv):
     global _devices, _histograms
 
     args = _parse_options(argv)
-    _devices = args.devices
 
+    _devices = args.devices
     interval = args.interval
+    count = args.count
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
@@ -547,7 +555,7 @@ def main(argv):
         ioh.create_bin_regions()
         _histograms.append(ioh)
 
-    while True:
+    while count:
         for dev in _devices:
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
             out = _get_cmd_output(cmdstr % dev)
@@ -565,6 +573,7 @@ def main(argv):
             ioh.update_bin_regions()
 
         time.sleep(interval)
+        count -= 1
 
     _remove_all_regions()
 
