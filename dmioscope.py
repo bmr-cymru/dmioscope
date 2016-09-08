@@ -249,8 +249,14 @@ class IOHistogram(object):
         self.adapt = adapt
 
         nr_bins = self._init_bins()
-        log_info("Initialised %s histogram with %d bins, min_size=%d."
-                 % (_counters[counter], nr_bins, self.min_size))
+
+        if self.adapt:
+            hist_type = "adaptive"
+        else:
+            hist_type = "fixed"
+
+        log_info("Initialised %s %s histogram with %d bins, min_size=%d."
+                 % (_counters[counter], hist_type, nr_bins, self.min_size))
 
     def update(self, data, test=False):
         """ Populate or update the histogram using the string counter
@@ -531,10 +537,14 @@ def _parse_options(args):
     parser.add_argument("devices", metavar="dev", nargs="+",
                         help="Device(s) to monitor.")
 
+    # argument groups
+
+    adaptp = parser.add_mutually_exclusive_group(required=False)
+
     # switches and options
-    parser.add_argument("-a", "--adaptive", action="store_true",
-                        dest="adaptive", default=True,
-                        help="Adapt the number of bins to observed IO volume.")
+    adaptp.add_argument("-a", "--adaptive", action="store_true",
+                        dest="adaptive", help="Adapt the number of"
+                        "bins to observed IO volume.")
 
     parser.add_argument("-b", "--bins", action="store", type=int,
                         dest="bins", metavar="nr", default=1,
@@ -544,13 +554,17 @@ def _parse_options(args):
                         dest="current", default=True,
                         help="Show the current interval plot.")
 
-    parser.add_argument("-s", "--summary", action="store_true",
-                        dest="summary", default=False,
-                        help="Show the accumulated summary plot.")
+    adaptp.add_argument("-n", "--no-adaptive", action="store_false",
+                        dest="adaptive", help="Do not adapt the number of bins"
+                        "according to observed IO volume.")
 
     parser.add_argument("-p", "--percent", action="store_true",
                         dest="percent", default=False,
                         help="Show distribution values as percentages.")
+
+    parser.add_argument("-s", "--summary", action="store_true",
+                        dest="summary", default=False,
+                        help="Show the accumulated summary plot.")
 
     return parser.parse_args()
 
