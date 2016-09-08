@@ -548,6 +548,8 @@ def main(argv):
     _devices = args.devices
     interval = args.interval
     count = args.count
+    if not count:
+        count = -1
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
