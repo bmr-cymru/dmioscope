@@ -19,12 +19,12 @@ import struct
 _dm_report_fields = "read_count,write_count"
 _dm_report_cmd = "dmstats report --noheadings -o"
 
-READ_COUNT = 0
-WRITE_COUNT = 1
+READS_COUNT = 0
+WRITES_COUNT = 1
 
 _counters = [
-    "READ_COUNT",
-    "WRITE_COUNT"
+    "READS_COUNT",
+    "WRITES_COUNT"
 ]
 
 _test=False
@@ -147,7 +147,7 @@ RENDER_TOTALS = 2
 class IOHistogram(object):
 
     # IOHistogram instance variables
-    counter = 0 # READ_COUNT
+    counter = 0 # READS_COUNT
     nr_bins = 0
     dev_size = 0
     device = None
@@ -203,10 +203,10 @@ class IOHistogram(object):
 
             For e.g.:
 
-            ioh = IOHistogram([2048, 4096, 6144, 8192], READ_COUNT);
+            ioh = IOHistogram([2048, 4096, 6144, 8192], READS_COUNT);
 
             Will create a histogram with four bins from 0..1M, 1M..2M,
-            2M..3M, and 3M..4M, tracking the READ_COUNT counter.
+            2M..3M, and 3M..4M, tracking the READS_COUNT counter.
         """
         self.device = device
         self.bounds = bounds
@@ -230,10 +230,10 @@ class IOHistogram(object):
 
             For e.g.:
 
-            ioh = IOHistogram([2048, 4096, 6144, 8192], READ_COUNT);
+            ioh = IOHistogram([2048, 4096, 6144, 8192], READS_COUNT);
 
             Will create a histogram with four bins from 0..1M, 1M..2M,
-            2M..3M, and 3M..4M, tracking the READ_COUNT counter.
+            2M..3M, and 3M..4M, tracking the READS_COUNT counter.
         """
         self.device = device
         self.dev_size = _device_sectors(self.device)
@@ -539,7 +539,7 @@ def main(argv):
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
-        ioh = IOHistogram(dev, READ_COUNT);
+        ioh = IOHistogram(dev, READS_COUNT);
         ioh.create_bin_regions()
         _histograms.append(ioh)
 
