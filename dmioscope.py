@@ -190,7 +190,7 @@ class IOHistogram(object):
         log_verbose(bounds)
         return bounds
 
-    def __init__(self, device, counter, bounds):
+    def __init__(self, device, counter, bounds, adapt=True):
         """ Initialise an IOHistogram using the sector boundaries listed
             in bins. Boundary values are given as an upper bound on the
             current bin, with an implicit lower bound of 0 on the first.
@@ -210,6 +210,9 @@ class IOHistogram(object):
         """
         self.device = device
         self.bounds = bounds
+        log_verbose(self.bounds)
+
+        self.adapt = adapt
 
         self.dev_size = _device_sectors(self.device)
         self.min_size = self.dev_size / _min_size_fraction
@@ -219,7 +222,7 @@ class IOHistogram(object):
         log_info("Initialised %s histogram with %d bins, min_size=%d."
                  % (_counters[counter], nr_bins, self.min_size))
 
-    def __init__(self, device, counter, initial_regions=1):
+    def __init__(self, device, counter, initial_bins=1, adapt=True):
         """ Initialise an IOHistogram with inital_regions bins evenly
             spaced across the specified device.
 
@@ -236,10 +239,15 @@ class IOHistogram(object):
             2M..3M, and 3M..4M, tracking the READS_COUNT counter.
         """
         self.device = device
+
         self.dev_size = _device_sectors(self.device)
         self.min_size = self.dev_size / _min_size_fraction
-        self.bounds = self._make_bounds(initial_regions)
-        print(self.bounds)
+
+        self.bounds = self._make_bounds(initial_bins)
+        log_verbose(self.bounds)
+
+        self.adapt = adapt
+
         nr_bins = self._init_bins()
         log_info("Initialised %s histogram with %d bins, min_size=%d."
                  % (_counters[counter], nr_bins, self.min_size))
@@ -425,6 +433,9 @@ class IOHistogram(object):
         print("")
 
     def update_bin_regions(self):
+        if not self.adapt:
+            return
+
         # zip bins, totals, and bounds into a tuple for splitting.
         inbins = zip(self.bins, self.totals, self.bounds, self.regions)
         outbins = []
@@ -509,6 +520,7 @@ _threshold = 5000
 def _parse_options(args):
     parser = argparse.ArgumentParser(description="IOScope arguments.")
 
+    # positional parameters
     parser.add_argument("interval", metavar="interval", nargs="?", default=5,
                         help="Duration of the report interval in seconds.",
                         type=float)
@@ -518,6 +530,15 @@ def _parse_options(args):
 
     parser.add_argument("devices", metavar="dev", nargs="+",
                         help="Device(s) to monitor.")
+
+    # switches and options
+    parser.add_argument("-a", "--adaptive", action="store_true",
+                        dest="adaptive", default=True,
+                        help="Adapt the number of bins to observed IO volume.")
+
+    parser.add_argument("-b", "--bins", action="store", type=int,
+                        dest="bins", metavar="nr", default=1,
+                        help="Divide devices into nr equally sized bins.")
 
     parser.add_argument("-c", "--current", action="store_true",
                         dest="current", default=True,
@@ -545,15 +566,19 @@ def main(argv):
 
     args = _parse_options(argv)
 
-    _devices = args.devices
     interval = args.interval
     count = args.count
+    _devices = args.devices
+
+    adapt = args.adaptive
+    nr_bins = args.bins
+
     if not count:
         count = -1
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
-        ioh = IOHistogram(dev, READS_COUNT);
+        ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt);
         ioh.create_bin_regions()
         _histograms.append(ioh)
 
