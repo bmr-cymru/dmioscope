@@ -543,8 +543,8 @@ def _parse_options(args):
 
     # switches and options
     adaptp.add_argument("-a", "--adaptive", action="store_true",
-                        dest="adaptive", help="Adapt the number of"
-                        "bins to observed IO volume.")
+                        dest="adaptive", default=True,
+                        help="Adapt the number of bins to observed IO volume.")
 
     parser.add_argument("-b", "--bins", action="store", type=int,
                         dest="bins", metavar="nr", default=1,
