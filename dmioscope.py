@@ -168,8 +168,8 @@ class IOHistogram(object):
             self.bins.append(_bin)
             _tot_bin = Bin(start, val - start)
             self.totals.append(_tot_bin)
-            log_info("Initialised bin @ %d width %d"
-                     % (start, (val - start)))
+            log_verbose("Initialised bin @ %d width %d"
+                        % (start, (val - start)))
             start = val
             nr_bins += 1
         self.dev_size = start
@@ -258,7 +258,7 @@ class IOHistogram(object):
 
         # data contains one row per histogram bin
         for line in data.splitlines():
-            print("row: " + line)
+            log_verbose("row: " + line)
             counters = line.split(":")
 
             if _bin > self.nr_bins:
