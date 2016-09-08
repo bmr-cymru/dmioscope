@@ -519,6 +519,9 @@ def _parse_options(args):
     parser.add_argument("-p", "--percent", action="store_true",
                       dest="percent", default=False,
                       help="Show distribution values as percentages.")
+    parser.add_argument("-i", "--interval", action="store", type=int,
+                        help="Interval to wait inbetween reports.",
+                        dest="interval", default="3")
 
     return parser.parse_args()
 
@@ -535,7 +538,7 @@ def main(argv):
     args = _parse_options(argv)
     _devices = args.devices
 
-    interval = 3
+    interval = args.interval
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
