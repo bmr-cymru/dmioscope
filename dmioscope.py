@@ -570,6 +570,10 @@ def _parse_options(args):
                         dest="thresh", default = 5000, help="Threshold at "
                         "which to split a bin when using --adaptive")
 
+    parser.add_argument("-v", "--verbose", action="store_true",
+                        dest="verbose", default=False, help="Enable verbose "
+                        "debugging messages.")
+
     return parser.parse_args()
 
 _devices = []
@@ -580,7 +584,7 @@ def _remove_all_regions():
         ioh.remove_bin_regions()
 
 def main(argv):
-    global _devices, _histograms, _threshold
+    global _devices, _histograms, _threshold, _verbose
 
     args = _parse_options(argv)
 
@@ -588,6 +592,7 @@ def main(argv):
     count = args.count
     _devices = args.devices
     _threshold = args.thresh
+    _verbose = args.verbose
 
     adapt = args.adaptive
     nr_bins = args.bins
