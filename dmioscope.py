@@ -57,6 +57,8 @@ _counters = [
     "WRITES_COUNT"
 ]
 
+CLEAR_SCREEN = "\033c"
+
 _test=False
 _verbose=False
 
@@ -645,6 +647,10 @@ def _parse_options(args):
                         dest="bins", metavar="NR_BINS", default=1,
                         help="Divide devices into nr equally sized bins.")
 
+    parser.add_argument("--clear", action="store_true",
+                        dest="clear", default=False, help="Clear the screen "
+                        "before each update.")
+
     parser.add_argument("-c", "--current", action="store_true",
                         dest="current", default=True,
                         help="Show the current interval plot.")
@@ -702,6 +708,8 @@ def main(argv):
 
     interval = args.interval
     count = args.count
+    clear = args.clear
+
     _devices = args.devices
     _threshold = args.thresh
     _verbose = args.verbose
@@ -738,6 +746,8 @@ def main(argv):
             # Sleep at the top of the interval to accumulate some initial
             # data to display.
             time.sleep(interval)
+            if clear:
+                print(CLEAR_SCREEN)
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
             out = _get_cmd_output(cmdstr % dev)
 
