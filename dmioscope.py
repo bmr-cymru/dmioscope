@@ -586,6 +586,10 @@ def _parse_options(args):
                         dest="percent", default=False,
                         help="Show distribution values as percentages.")
 
+    parser.add_argument("-r", "--rows", action="store", type=int,
+                        dest="rows", default=None, help="Specify the maxumum "
+                        "number of rows to use.")
+
     parser.add_argument("-s", "--summary", action="store_true",
                         dest="summary", default=False,
                         help="Show the accumulated summary plot.")
@@ -597,6 +601,10 @@ def _parse_options(args):
     parser.add_argument("-v", "--verbose", action="store_true",
                         dest="verbose", default=False, help="Enable verbose "
                         "debugging messages.")
+
+    parser.add_argument("-w", "--width", action="store", type=int,
+                        dest="width", default=None, help="Specify the maximum "
+                        "terminal width to use.")
 
     return parser.parse_args()
 
@@ -621,6 +629,13 @@ def main(argv):
     adapt = args.adaptive
     nr_bins = args.bins
 
+    if not args.width or not args.rows:
+        (w, h) = _terminal_size()
+        width = w if not args.width else args.width
+        rows = h if not args.rows else args.rows
+
+    width -= 8 # maximum length of final label
+
     if not count:
         count = -1
 
@@ -637,16 +652,15 @@ def main(argv):
             time.sleep(interval)
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
             out = _get_cmd_output(cmdstr % dev)
-            log_verbose(out)
 
             ioh.update(out, test=_test)
 
             if args.summary:
                 print("%s: accumulated IO distribution" % dev)
-                ioh.print_histogram(columns=160, render=RENDER_TOTALS)
+                ioh.print_histogram(columns=width, render=RENDER_TOTALS)
             if args.current:
                 print("%s: current IO distribution" % dev)
-                ioh.print_histogram(columns=160)
+                ioh.print_histogram(columns=width)
 
             ioh.update_bin_regions()
 
