@@ -15,6 +15,7 @@ import math
 import time
 import fcntl
 import struct
+import termios
 
 _dm_report_fields = "region_id,read_count,write_count"
 _dm_report_cmd = "dmstats report --noheadings -o"
@@ -40,6 +41,14 @@ def log_verbose(str):
 
 def log_error(str):
     print(str, file=sys.stderr)
+
+def _terminal_size():
+    """ Return the current terminal size as a ('w', 'h') tuple.
+    """
+    h, w, hp, wp = struct.unpack('HHHH',
+        fcntl.ioctl(0, termios.TIOCGWINSZ,
+        struct.pack('HHHH', 0, 0, 0, 0)))
+    return w, h
 
 def _device_sectors(dev_path):
     """ Return device size in 512b sectors.
@@ -433,10 +442,15 @@ class IOHistogram(object):
                   % (point, self.io_distribution(point, total=False)))
         print("")
 
+    def update_region_map(self):
+        index = xrange(len(self.regions))
+        self.region_map = dict(zip(self.regions, index))
+
     def update_bin_regions(self):
         if not self.adapt:
             return
 
+        log_verbose("Updating bin regions (nr_bins=%d)" % self.nr_bins)
         # zip bins, totals, and bounds into a tuple for splitting.
         inbins = zip(self.bins, self.totals, self.bounds, self.regions)
         outbins = []
