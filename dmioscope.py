@@ -475,7 +475,7 @@ class IOHistogram(object):
         index = xrange(len(self.regions))
         self.region_map = dict(zip(self.regions, index))
 
-    def update_bin_regions(self):
+    def update_bin_regions(self, merge=False):
         if not self.adapt:
             return
 
@@ -484,11 +484,12 @@ class IOHistogram(object):
         inbins = zip(self.bins, self.totals, self.bounds, self.regions)
         outbins = []
         min_split = self.min_size * 2
+
+        # copy from inbins to outbins, splitting and merging as needed.
         for inbin in inbins:
             (_bin, _tot, bound, region) = inbin
-            if (_bin.count <= _threshold or _bin.width < min_split):
-                outbins.append(inbin)
-            else:
+            if (_bin.count > _threshold and _bin.width >= min_split):
+                log_verbose("  Splitting region @ %d" % _bin.start)
                 newbin = _bin.split()
                 newtot = _tot.split()
 
@@ -504,6 +505,46 @@ class IOHistogram(object):
                 outbins.append((newbin, newtot, newbound, newregion))
 
                 self.nr_bins += 1
+            else:
+                # merge neighbouring bins?
+                mergeable = (len(outbins) and
+                             _bin.count <= _merge_threshold and
+                             outbins[-1][0].count <= _merge_threshold)
+                if (merge and mergeable):
+                        lastbin = outbins.pop()
+                        log_verbose("  Merging regions @ %d, %d" %
+                                    (lastbin[0].start, _bin.start))
+
+                        # current bin
+                        lastbin[0].count += _bin.count
+                        lastbin[0].width += _bin.width
+
+                        # totals bin
+                        lastbin[1].count += _tot.count
+                        lastbin[1].width += _tot.width
+
+                        # update bounds
+                        newbound = lastbin[0].bound()
+
+                        # update dmstats regions
+                        # FIXME: this is simple but leads to many create /
+                        # delete operations when large numbers of consecutive
+                        # regions are merged.
+                        self._remove_bin_region(region)
+                        self._remove_bin_region(lastbin[3])
+
+                        newregion = self._create_bin_region(lastbin[0].start,
+                                                            lastbin[0].width)
+
+                        outbins.append(
+                            (lastbin[0], lastbin[1], newbound, newregion)
+                        )
+
+                        self.nr_bins -= 1
+
+                else:
+                    log_verbose("  Keeping region @ %d" % _bin.start)
+                    outbins.append(inbin)
 
         (_bins, _tots, bounds, regions) = zip(*outbins)
 
@@ -575,6 +616,7 @@ def _get_cmd_output(cmd,stderr=False):
 
 # threshold at which to split a bin in two.
 _threshold = 5000
+_merge_threshold = 0
 
 def _parse_options(args):
     parser = argparse.ArgumentParser(description="IOScope arguments.")
@@ -607,6 +649,15 @@ def _parse_options(args):
                         dest="current", default=True,
                         help="Show the current interval plot.")
 
+    parser.add_argument("-m", "--merge", action="store_true",
+                        dest="merge", default=False, help="Allow merging of "
+                        "bins with low IO volume in adaptive mode.")
+
+    parser.add_argument("-M", "--merge-threshold", action="store", type=int,
+                        dest="merge_thresh", default=0, help="Threshold at "
+                              "which to merge adjacent regions with low IO.",
+                        metavar="MERGE_THRESH")
+
     adaptp.add_argument("-n", "--no-adaptive", action="store_false",
                         dest="adaptive", help="Do not adapt the number of bins"
                         " according to observed IO volume.")
@@ -624,7 +675,7 @@ def _parse_options(args):
                         help="Show the accumulated summary plot.")
 
     parser.add_argument("-t", "--threshold", action="store", type=int,
-                        dest="thresh", default = 5000, help="Threshold at "
+                        dest="thresh", default=5000, help="Threshold at "
                         "which to split a bin when using --adaptive")
 
     parser.add_argument("-v", "--verbose", action="store_true",
@@ -645,7 +696,7 @@ def _remove_all_regions():
         ioh.remove_bin_regions()
 
 def main(argv):
-    global _devices, _histograms, _threshold, _verbose
+    global _devices, _histograms, _merge_threshold, _threshold, _verbose
 
     args = _parse_options(argv)
 
@@ -656,12 +707,20 @@ def main(argv):
     _verbose = args.verbose
 
     adapt = args.adaptive
+    merge = args.merge
+    _merge_threshold = args.merge_thresh
+
     nr_bins = args.bins
 
     if not args.width or not args.rows:
         (w, h) = _terminal_size()
         width = w if not args.width else args.width
         rows = h if not args.rows else args.rows
+
+    log_verbose("Starting %dx%d IOScope histogram" % (width, rows))
+    log_verbose("adapt=%s, merge=%s, thresh=%d, merge_thresh=%d, "
+                "nr_bins=%d" % (adapt, merge, _threshold,
+                                _merge_threshold, nr_bins))
 
     width -= 8 # maximum length of final label
 
@@ -691,7 +750,7 @@ def main(argv):
                 print("%s: current IO distribution" % dev)
                 ioh.print_histogram(columns=width)
 
-            ioh.update_bin_regions()
+            ioh.update_bin_regions(merge=merge)
 
             count -= 1
 
