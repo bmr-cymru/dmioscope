@@ -1,7 +1,36 @@
 #!/usr/bin/python
-# dmshist.py - IO frequency by disk location
+# dmioscope.py - IO frequency by disk location
 #
-# Usage: dmshist.py <dm_device>
+# Usage:
+#
+#  dmioscope.py [-h] [-a] [-b NR_BINS] [-c] [-n] [-p] [-r ROWS] [-s]
+#                      [-t THRESH] [-v] [-w WIDTH]
+#                      [interval] [count] dev [dev ...]
+#
+#  IOScope arguments.
+#
+#  positional arguments:
+#    interval              Duration of the report interval in seconds.
+#    count                 Number of intervals to report.
+#    dev                   Device(s) to monitor.
+#
+#  optional arguments:
+#    -h, --help            show this help message and exit
+#    -a, --adaptive        Adapt the number of bins to observed IO volume.
+#    -b NR_BINS, --bins NR_BINS
+#                          Divide devices into nr equally sized bins.
+#    -c, --current         Show the current interval plot.
+#    -n, --no-adaptive     Do not adapt the number of bins according to observed
+#                          IO volume.
+#    -p, --percent         Show distribution values as percentages.
+#    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
+#    -s, --summary         Show the accumulated summary plot.
+#    -t THRESH, --threshold THRESH
+#                          Threshold at which to split a bin when using
+#                          --adaptive
+#    -v, --verbose         Enable verbose debugging messages.
+#    -w WIDTH, --width WIDTH
+#                          Specify the maximum terminal width to use.
 #
 from __future__ import print_function
 
