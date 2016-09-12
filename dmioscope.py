@@ -16,7 +16,7 @@ import time
 import fcntl
 import struct
 
-_dm_report_fields = "read_count,write_count"
+_dm_report_fields = "region_id,read_count,write_count"
 _dm_report_cmd = "dmstats report --noheadings -o"
 
 READS_COUNT = 0
@@ -157,6 +157,7 @@ class IOHistogram(object):
     regions = None # current region_ids
     bins = None
     totals = None
+    region_map = dict()
 
     def _init_bins(self):
         self.bins = []
@@ -266,26 +267,21 @@ class IOHistogram(object):
             to the counter values in data and this is added to the
             historical totals for the histogram.
         """
-        _bin = 0
         if test:
             return self._test_update()
 
-        log_verbose(data.strip())
-
+        log_verbose("Updating %d histogram bins" % self.nr_bins)
         # data contains one row per histogram bin
         for line in data.splitlines():
-            log_verbose("row: " + line)
-            counters = line.split(":")
+            fields = line.split(":")
+            counters = fields[1:]
+            region = int(fields[0])
+            log_verbose("%d: %s" % (region, counters[self.counter]))
 
-            if _bin > self.nr_bins:
-                log_error("Unexpected row in histogram data")
-                return False
-
-            # FIXME for counter in counters.. sum
+            _bin = self.region_map[region]
             value = int(counters[self.counter])
             self.bins[_bin].count = value
             self.totals[_bin].count += value
-            _bin += 1
 
     def _test_update(self):
         data = ""
@@ -472,13 +468,22 @@ class IOHistogram(object):
         self.totals = list(_tots)
         self.bounds = list(bounds)
         self.regions = list(regions)
+        self.update_region_map()
+
+        log_verbose("Updated bins: %d bins, %d totals, %d bounds, %d regions." %
+                    (len(self.bins), len(self.totals), len(self.bounds), len(self.regions)))
+
+        out = _get_cmd_output("dmstats list %s" % self.device)
+        log_verbose(out)
 
     def _create_bin_region(self, start, length):
         out = _get_cmd_output("dmstats create --start %d --length %d %s"
                               % (start, length, self.device))
-
         if not out:
             return -1
+
+        log_verbose("Created region_id %d @ %d length=%d)" %
+                    (int(out.strip().split()[-1]), start, length))
 
         return int(out.strip().split()[-1])
 
@@ -489,19 +494,25 @@ class IOHistogram(object):
             regions.append(self._create_bin_region(start, bound - start))
             start = bound
         self.regions = regions
+        self.update_region_map()
 
     def _remove_bin_region(self, region_id):
         dev_region = (region_id, self.device)
         out = _get_cmd_output("dmstats delete --regionid %d %s" % dev_region)
+        log_verbose("Removed region_id %d from %s" % dev_region)
 
     def remove_bin_regions(self):
         for region in self.regions:
             self._remove_bin_region(region)
 
+_log_commands = True
 
 def _get_cmd_output(cmd,stderr=False):
     args = shlex.split(cmd)
-    log_verbose("_get_cmd_output('%s')" % cmd)
+
+    if _log_commands:
+        log_verbose("_get_cmd_output('%s')" % cmd)
+
     try:
         p = Popen(args, shell=False, stdout=PIPE,
                   stderr=STDOUT if stderr else PIPE,
