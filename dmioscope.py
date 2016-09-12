@@ -32,8 +32,8 @@
 #    -b NR_BINS, --bins NR_BINS
 #                          Divide devices into nr equally sized bins.
 #    -c, --current         Show the current interval plot.
-#    -n, --no-adaptive     Do not adapt the number of bins according to observed
-#                          IO volume.
+#    -n, --no-adaptive     Do not adapt the number of bins according to
+#                          observed IO volume.
 #    -p, --percent         Show distribution values as percentages.
 #    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
 #    -s, --summary         Show the accumulated summary plot.
@@ -71,32 +71,37 @@ _counters = [
 
 CLEAR_SCREEN = "\033c"
 
-_test=False
-_verbose=False
+_test = False
+_verbose = False
+
 
 def log_info(str):
     print(str)
+
 
 def log_verbose(str):
     if not _verbose:
         return
     print(str)
 
+
 def log_error(str):
     print(str, file=sys.stderr)
+
 
 def _terminal_size():
     """ Return the current terminal size as a ('w', 'h') tuple.
     """
     h, w, hp, wp = struct.unpack('HHHH',
-        fcntl.ioctl(0, termios.TIOCGWINSZ,
-        struct.pack('HHHH', 0, 0, 0, 0)))
+                                 fcntl.ioctl(0, termios.TIOCGWINSZ,
+                                             struct.pack('HHHH', 0, 0, 0, 0)))
     return w, h
+
 
 def _device_sectors(dev_path):
     """ Return device size in 512b sectors.
     """
-    req = 0x80081272 # BLKGETSIZE64, result is bytes as uint64_t.
+    req = 0x80081272  # BLKGETSIZE64, result is bytes as uint64_t.
     buf = ' ' * 8
     fmt = 'L'
 
@@ -115,6 +120,7 @@ def _device_sectors(dev_path):
 # Heckbert's Axis Labelling Algorithm ("nice numbers"), from:
 # "Graphics Gems", Paul S. Heckbert, 1988.
 
+
 def frange(start, end, step):
     """ Yield a range of floats, beginning at 'start' and
         incrementing by 'step' until 'end'.
@@ -122,6 +128,7 @@ def frange(start, end, step):
     while start <= end:
         yield start
         start += step
+
 
 def find_nice(x, round_val):
     """ Find a "nice" number that is approximately equal to 'x'.
@@ -149,6 +156,7 @@ def find_nice(x, round_val):
             nf = 10
     return nf * math.pow(10, expv)
 
+
 def label_value_axis(minval, maxval, nticks):
     if not maxval:
         maxval = nticks
@@ -156,18 +164,20 @@ def label_value_axis(minval, maxval, nticks):
     d = find_nice(span / (nticks - 1), 1)
     graphmin = math.floor(minval / d) * d
     graphmax = math.ceil(maxval / d) * d
-    #nfrac = max(-math.floor(math.log10(d)), 0)
+    # nfrac = max(-math.floor(math.log10(d)), 0)
     labels = []
     for x in frange(graphmin, graphmax + 0.5 * d, d):
         labels.append(x)
     return labels
 
+
 def _sizeof_fmt(num, suffix='B'):
-    for unit in ['','Ki','Mi','Gi','Ti','Pi','Ei','Zi']:
+    for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
         num /= 1024.0
     return "%.1f%s%s" % (num, 'Yi', suffix)
+
 
 class Bin(object):
     count = 0
@@ -198,15 +208,16 @@ _min_size_fraction = 40
 RENDER_COUNTS = 1
 RENDER_TOTALS = 2
 
+
 class IOHistogram(object):
 
     # IOHistogram instance variables
-    counter = 0 # READS_COUNT
+    counter = 0  # READS_COUNT
     nr_bins = 0
     dev_size = 0
     device = None
-    bounds = None # current bounds set
-    regions = None # current region_ids
+    bounds = None  # current bounds set
+    regions = None  # current region_ids
     bins = None
     totals = None
     region_map = dict()
@@ -402,7 +413,7 @@ class IOHistogram(object):
 
         for _bin in sorted_bins:
             count_sum += _bin.count
-            size += _bin.width;
+            size += _bin.width
             if (count_sum > thresh):
                 break
 
@@ -475,10 +486,10 @@ class IOHistogram(object):
                     count_diff = _tot.count - _bin.count
                     row += int(((count_diff) * counts_per_char) / scale) * "@"
                 print(row)
-                label = "" # only label 1st row
+                label = ""  # only label 1st row
 
         # FIXME: command line option
-        #points = [50.0, 66.6, 75.0, 90.0, 95.0, 99.0]
+        # points = [50.0, 66.6, 75.0, 90.0, 95.0, 99.0]
         points = [90.0]
         for point in points:
             print("%.2f%% of IO reaches %.2f%% of disk."
@@ -568,8 +579,10 @@ class IOHistogram(object):
         self.regions = list(regions)
         self.update_region_map()
 
-        log_verbose("Updated bins: %d bins, %d totals, %d bounds, %d regions." %
-                    (len(self.bins), len(self.totals), len(self.bounds), len(self.regions)))
+        log_verbose("Updated bins: %d bins, %d totals, "
+                    "%d bounds, %d regions." %
+                    (len(self.bins), len(self.totals),
+                     len(self.bounds), len(self.regions)))
 
         out = _get_cmd_output("dmstats list %s" % self.device)
         log_verbose(out)
@@ -605,7 +618,8 @@ class IOHistogram(object):
 
 _log_commands = True
 
-def _get_cmd_output(cmd,stderr=False):
+
+def _get_cmd_output(cmd, stderr=False):
     args = shlex.split(cmd)
 
     if _log_commands:
@@ -631,6 +645,7 @@ def _get_cmd_output(cmd,stderr=False):
 # threshold at which to split a bin in two.
 _threshold = 5000
 _merge_threshold = 0
+
 
 def _parse_options(args):
     parser = argparse.ArgumentParser(description="IOScope arguments.")
@@ -709,9 +724,11 @@ def _parse_options(args):
 _devices = []
 _histograms = []
 
+
 def _remove_all_regions():
     for ioh in _histograms:
         ioh.remove_bin_regions()
+
 
 def main(argv):
     global _devices, _histograms, _merge_threshold, _threshold, _verbose
@@ -742,14 +759,14 @@ def main(argv):
                 "nr_bins=%d" % (adapt, merge, _threshold,
                                 _merge_threshold, nr_bins))
 
-    width -= 8 # maximum length of final label
+    width -= 8  # maximum length of final label
 
     if not count:
         count = -1
 
     for dev in _devices:
         out = _get_cmd_output("dmstats delete --allregions %s" % dev)
-        ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt);
+        ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt)
         ioh.create_bin_regions()
         _histograms.append(ioh)
 
