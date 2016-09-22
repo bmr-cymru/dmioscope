@@ -1,31 +1,33 @@
 # dmioscope - track IO distribution with dmstats
 
-The dmioscope script provides a simple tool to track and visualise
-the distribution of IO requests across a device's address space by
+The dmioscope script provides a simple tool to track and visualise the
+distribution of IO requests across a device's address space by
 maintaining a histogram that counts IO requests by location.
 
-The device can either be split into a fixed number of equally
-sized regions (the same set of regions will be reported in each
-successive update), or the script can attempt to adapt the number,
-and size, of bins to the observed IO volumes: in this case the
-set of bins (and their sizes) may change between updates.
+The device can either be split into a fixed number of equally sized
+regions (the same set of regions will be reported in each successive
+update), or the script can attempt to adapt the number, and size, of
+bins to the observed IO volumes: in this case the set of bins (and their
+sizes) may change between updates.
 
 The static mode is useful in order to obtain fixed, repeatable
-statistics for measurement purposes: adaptive mode is best suited
-to interactive use where the user is trying to get a rough idea
-of the current IO distribution on the device.
+statistics for measurement purposes: adaptive mode is best suited to
+interactive use where the user is trying to get a rough sense of the
+current IO distribution on the device, or where the distribution is
+expected to shift significantly during a run.
 
-The command accepts count and interval arguments to allow reports
-to be continually generated from current data.
+The command accepts count and interval arguments to allow reports to be
+continually generated from current data, and switches and options to
+control histogram adaptation and display properties.
 
 
 # Requirements
 
-To use dmioscope you need a Linux installation with one or more
+To use dmioscope you will need a Linux installation with one or more
 device-mapper devices to monitor, and an installed copy of the
-device-mapper tools and libraries that includes the 'dmstats'
-command (at least device-mapper 1.02.104 - included in the lvm2
-v2.02.127 tarball and any later distribution packages).
+device-mapper tools and libraries that includes the 'dmstats' command
+(at least device-mapper 1.02.104 - included in the lvm2 v2.02.127
+tarball and any later distribution packages).
 
 # IOScope histograms
 
@@ -34,11 +36,19 @@ of IO reaching different regions of a device-mapper device. This allows
 an estimate of the IO distribution to be shown for the device, both for
 short and long-term observations.
 
+The display presents a histogram with its bins occupying successive
+lines of the display, and with bin values plotted horizontally across
+rows.
+
+Axis labels indicate the quantity of disk space represented by each bin
+and the frequency of IO to each region (expressed as values proportional
+to the number of events per unit disk space).
+
+
 ## Histogram bins
 
-Each bin in an ioscope histogram corresponds to a fixed range of
-device sectors, for example, consider an 8MiB device divided into
-eight bins:
+Each bin in an ioscope histogram corresponds to a fixed range of device
+sectors. For example, consider an 8MiB device divided into eight bins:
 
 ```
    Bin:  0    1    2    3    4    5    6    7
@@ -47,11 +57,11 @@ eight bins:
         +----+----+----+----+----+----+----+----+
 ```
 
-In this case, each bin is of equal size (1MiB), although this need
-not be the case generally.
+In this case, each bin is of equal size (1MiB), although this need not
+be the case generally.
 
-The count for each bin indicates the number of matching IO events
-that were observed in that bin for the current interval.
+The count for each bin indicates the number of matching IO events that
+were observed in that bin for the current interval.
 
 When plotted graphically, the area of each bin's plotted region is
 proportional to the count of IOs observed in that region:
