@@ -590,14 +590,23 @@ class IOHistogram(object):
                     (len(self.bins), len(self.totals),
                      len(self.bounds), len(self.regions)))
 
+        # Failure to list regions is fatal.
         out = _get_cmd_output("dmstats list %s" % self.device)
+        if not out:
+            log_error("Could not retrieve region list for device %s." % dev)
+            raise DmstatsException
+
         log_verbose(out)
 
     def _create_bin_region(self, start, length):
-        out = _get_cmd_output("dmstats create --start %d --length %d %s"
-                              % (start, length, self.device))
+        cmd = "dmstats create --start %d --length %d %s"
+        cmdstr = cmd % (start, length, self.device)
+
+        # Failure to create a region is fatal.
+        out = _get_cmd_output(cmdstr)
         if not out:
-            return -1
+            log_error("Could not create region on device %s" % self.device)
+            raise DmstatsException
 
         log_verbose("Created region_id %d @ %d length=%d)" %
                     (int(out.strip().split()[-1]), start, length))
@@ -615,17 +624,29 @@ class IOHistogram(object):
 
     def _remove_bin_region(self, region_id):
         dev_region = (region_id, self.device)
+
         out = _get_cmd_output("dmstats delete --regionid %d %s" % dev_region)
+        # FIXME: 'dmstats delete' produces no output by default (maybe it
+        # should?), meaning with the current _get_command_output() there is
+        # no way to distinguish this from an error running the command.
+        #
+        # For now this is not so important: a systemic problem (e.g. libs
+        # incompatible) will cause errors long before reaching this point.
+        #
+        #if not out:
+        #    raise DmstatsException
+
         log_verbose("Removed region_id %d from %s" % dev_region)
 
     def remove_bin_regions(self):
         for region in self.regions:
             self._remove_bin_region(region)
 
+
 _log_commands = True
 
 
-def _get_cmd_output(cmd, stderr=False):
+def _get_cmd_output(cmd):
     args = shlex.split(cmd)
 
     if _log_commands:
@@ -633,17 +654,19 @@ def _get_cmd_output(cmd, stderr=False):
 
     try:
         p = Popen(args, shell=False, stdout=PIPE,
-                  stderr=STDOUT if stderr else PIPE,
-                  bufsize=-1, close_fds=True)
-        stdout, stderr = p.communicate()
+                  stderr=STDOUT, bufsize=-1, close_fds=True)
+        # stderr will always be None
+        (stdout, stderr) = p.communicate()
     except OSError as e:
         if e.errno == errno.ENOENT:
             return None
         else:
             raise e
 
+    if _log_commands or p.returncode != 0:
+        log_verbose(stdout.strip())
+
     if p.returncode != 0:
-        log_verbose(stdout)
         return None
 
     return stdout
@@ -771,7 +794,6 @@ def main(argv):
         count = -1
 
     for dev in _devices:
-        out = _get_cmd_output("dmstats delete --allregions %s" % dev)
         ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt)
         ioh.create_bin_regions()
         _histograms.append(ioh)
@@ -783,8 +805,15 @@ def main(argv):
             time.sleep(interval)
             if clear:
                 print(CLEAR_SCREEN)
-            cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
-            out = _get_cmd_output(cmdstr % dev)
+
+            cmdstr = _dm_report_cmd + _dm_report_fields + " %s" % dev
+
+            # Failure to retrieve region data is fatal.
+            out = _get_cmd_output(cmdstr)
+            if not out:
+                log_error("Could not retrieve counter data for regions "
+                          "on device %s." % dev)
+                raise DmstatsException
 
             ioh.update(out, test=_test)
 
