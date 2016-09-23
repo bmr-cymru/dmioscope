@@ -34,7 +34,6 @@
 #    -c, --current         Show the current interval plot.
 #    -n, --no-adaptive     Do not adapt the number of bins according to
 #                          observed IO volume.
-#    -p, --percent         Show distribution values as percentages.
 #    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
 #    -s, --summary         Show the accumulated summary plot.
 #    -t THRESH, --threshold THRESH
@@ -728,10 +727,6 @@ def _parse_options(args):
     adaptp.add_argument("-n", "--no-adaptive", action="store_false",
                         dest="adaptive", help="Do not adapt the number of bins"
                         " according to observed IO volume.")
-
-    parser.add_argument("-p", "--percent", action="store_true",
-                        dest="percent", default=False,
-                        help="Show distribution values as percentages.")
 
     parser.add_argument("-r", "--rows", action="store", type=int,
                         dest="rows", default=None, help="Specify the maxumum "
