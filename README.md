@@ -25,8 +25,8 @@ control histogram adaptation and display properties.
 
 To use dmioscope you will need a Linux installation with one or more
 device-mapper devices to monitor, and an installed copy of the
-device-mapper tools and libraries that includes the 'dmstats' command
-(at least device-mapper 1.02.104 - included in the lvm2 v2.02.127
+device-mapper tools and libraries that includes the `dmstats` command
+(at least device-mapper `1.02.104` - included in the lvm2 `v2.02.127`
 tarball and any later distribution packages).
 
 # IOScope histograms
