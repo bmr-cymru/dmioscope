@@ -114,7 +114,7 @@ explicitly calling the python interpreter).
 The command can be run either as:
 
 ```shell
-#program python ./dmioscope.py vg00/lvol0
+# python ./dmioscope.py vg00/lvol0
 ```
 
 Or by first making it executable with `chmod`:
