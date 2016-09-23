@@ -717,8 +717,8 @@ class IOHistogram(object):
         # For now this is not so important: a systemic problem (e.g. libs
         # incompatible) will cause errors long before reaching this point.
         #
-        #if not out:
-        #    raise DmstatsException
+        # if not out:
+        #     raise DmstatsException
 
         log_verbose("Removed region_id %d from %s" % dev_region)
 
