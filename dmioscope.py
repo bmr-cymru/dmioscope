@@ -798,14 +798,20 @@ def main(argv):
         ioh.create_bin_regions()
         _histograms.append(ioh)
 
-    while count:
-        for dev in _devices:
-            # Sleep at the top of the interval to accumulate some initial
-            # data to display.
-            time.sleep(interval)
-            if clear:
-                print(CLEAR_SCREEN)
+    start_time = time.time()
 
+    while count:
+        # Sleep at the top of the interval to accumulate some initial
+        # data to display. Since there's no direct way to access the
+        # timerfd_create() or setitimer() interfaces from python use
+        # a simple sleep() but correct the actual duration for each
+        # interval based on the accumulated error.
+        time.sleep(interval - ((time.time() - start_time) % interval))
+
+        if clear:
+            print(CLEAR_SCREEN)
+
+        for dev in _devices:
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s" % dev
 
             # Failure to retrieve region data is fatal.
