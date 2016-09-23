@@ -662,10 +662,8 @@ def _get_cmd_output(cmd):
         # stderr will always be None
         (stdout, stderr) = p.communicate()
     except OSError as e:
-        if e.errno == errno.ENOENT:
-            return None
-        else:
-            raise e
+        log_error("Could not call '%s': %s" % (args[0], e))
+        raise DmstatsException
 
     if _log_commands or p.returncode != 0:
         log_verbose(stdout.strip())
