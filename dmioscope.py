@@ -163,6 +163,9 @@ def find_nice(x, round_val):
 
 
 def label_value_axis(minval, maxval, nticks):
+    """ Return a list of floating point values that label the value
+        (horizontal) axis.
+    """
     if not maxval:
         maxval = nticks
     span = find_nice(maxval - minval, 0)
@@ -177,6 +180,9 @@ def label_value_axis(minval, maxval, nticks):
 
 
 def _sizeof_fmt(num, suffix='B'):
+    """ Format an integer value to a short floating point string with
+        units in binary prefix.
+    """
     for unit in ['', 'Ki', 'Mi', 'Gi', 'Ti', 'Pi', 'Ei', 'Zi']:
         if abs(num) < 1024.0:
             return "%3.1f%s%s" % (num, unit, suffix)
@@ -185,6 +191,12 @@ def _sizeof_fmt(num, suffix='B'):
 
 
 class Bin(object):
+    """ A histogram bin.
+
+        Stores the current counter value and the starting offset and
+        width, and allows splitting the bin into two equal parts (with
+        the width and count distributed between the two).
+    """
     count = 0
     start = 0
     width = 0
@@ -215,8 +227,12 @@ RENDER_TOTALS = 2
 
 
 class IOHistogram(object):
+    """ An IO distribution histogram.
 
-    # IOHistogram instance variables
+        Contains current and running total bins for each region in the
+        histogram, and provides methods to update, and render the IO
+        distributions, and to obtain values derived from them.
+    """
     counter = 0  # READS_COUNT
     nr_bins = 0
     dev_size = 0
@@ -250,6 +266,9 @@ class IOHistogram(object):
     def _make_bounds(self, nr_regions):
         """ Make a list of evenly spaced bounds values spanning an
             entire device.
+
+            `nr_regions` is the number of regions (bins) to divide the
+            device into.
         """
         if not self.dev_size:
             log_error("Found zero-sized device: %s" % device)
@@ -262,22 +281,31 @@ class IOHistogram(object):
         return bounds
 
     def __init__(self, device, counter, bounds, adapt=True):
-        """ Initialise an IOHistogram using the sector boundaries listed
-            in bins. Boundary values are given as an upper bound on the
-            current bin, with an implicit lower bound of 0 on the first.
-            The final bin should span all remaining space on the device.
+        """ Initialise an `IOHistogram` for `device`, using the sector
+            boundaries listed in `bounds`, and bind it to the dmstats
+            counter specified by `counter`.
 
-            All offsets are in 512b sectors.
+            Boundary values are given as an upper bound on the current
+            bin, with an implicit lower bound of 0 on the first. The
+            final bin should span all remaining space on the device.
 
-            The new histogram is bound to the counter field specified by
-            counter.
+            If `adapt` is True, the `IOHistogram` created will attempt
+            to adapt bin count and sizes to the observed IO volumes,
+            splitting and merging bins as the bin counts reach user
+            specified thresholds.
+
+            Bounds offsets are in 512b sectors.
 
             For e.g.:
 
-            ioh = IOHistogram([2048, 4096, 6144, 8192], READS_COUNT);
+            ```
+            bounds = [2048, 4096, 6144, 8192]
+            ioh = IOHistogram("vg00/lvol0", bounds, READS_COUNT, adapt=False)
+            ```
 
-            Will create a histogram with four bins from 0..1M, 1M..2M,
-            2M..3M, and 3M..4M, tracking the READS_COUNT counter.
+            Will create a non-adaptive histogram with four bins from
+            0..1M, 1M..2M,2M..3M, and 3M..4M, tracking the READS_COUNT
+            counter.
         """
         self.device = device
         self.bounds = bounds
@@ -294,20 +322,27 @@ class IOHistogram(object):
                  % (_counters[counter], nr_bins, self.min_size))
 
     def __init__(self, device, counter, initial_bins=1, adapt=True):
-        """ Initialise an IOHistogram with inital_regions bins evenly
-            spaced across the specified device.
+        """ Initialise an IOHistogram with `inital_bins` bins, evenly
+            spaced across the specified `device`.
 
             All offsets are in 512b sectors.
 
-            The new histogram is bound to the counter field specified by
+            The new IOHistogram is bound to the counter field specified by
             counter.
+
+            If `adapt` is True, the `IOHistogram` created will attempt
+            to adapt bin count and sizes to the observed IO volumes,
+            splitting and merging bins as the bin counts reach user
+            specified thresholds.
 
             For e.g.:
 
-            ioh = IOHistogram([2048, 4096, 6144, 8192], READS_COUNT);
+            ```
+            ioh = IOHistogram("vg00/lvol0", READS_COUNT, 8, adapt=True);
+            ```
 
-            Will create a histogram with four bins from 0..1M, 1M..2M,
-            2M..3M, and 3M..4M, tracking the READS_COUNT counter.
+            Will create an adaptive histogram with eight bins and binds
+            it to the READS_COUNT counter.
         """
         self.device = device
 
@@ -331,8 +366,8 @@ class IOHistogram(object):
 
     def update(self, data, test=False):
         """ Populate or update the histogram using the string counter
-            values in data. The current value of the histogram is set
-            to the counter values in data and this is added to the
+            values in `data`. The current value of the histogram is set
+            to the counter values in `data` and this is added to the
             historical totals for the histogram.
         """
         if test:
@@ -357,12 +392,16 @@ class IOHistogram(object):
             self.totals[_bin].count += value
 
     def _test_update(self):
+        """ Generate simple test data to update an `IOHistogram`.
+        """
         data = ""
         for i in xrange(self.nr_bins):
             data += "%d:%d\n" % (i, i)
         self.update(data)
 
     def min_width(self):
+        """ Return width of the smallest bin in this `IOHistogram`.
+        """
         return min([_bin.width for _bin in self.bins])
 
     def max_count(self):
@@ -376,6 +415,9 @@ class IOHistogram(object):
 
     def max_freq(self, total=False):
         """ Return the maximum frequency value contained in any bin.
+
+            If `total` is `True`, return the maximum value from the
+            running total histogram instead of the current histogram.
         """
         max_freq = 0.0
         min_width = self.min_width()
@@ -394,6 +436,9 @@ class IOHistogram(object):
 
     def sum(self, total=False):
         """ Return the sum of all count values for all bins.
+
+            If `total` is `True`, return the maximum value from the
+            running total histogram instead of the current histogram.
         """
         bin_sum = 0
         if total:
@@ -408,6 +453,9 @@ class IOHistogram(object):
     def io_distribution(self, percent, total=False):
         """ Return the proportion of disk reached by the specified
             percentage of IO requests.
+
+            If `total` is `True`, return the maximum value from the
+            running total histogram instead of the current histogram.
         """
         size = 0
         count_sum = 0
@@ -430,9 +478,16 @@ class IOHistogram(object):
         return ((100.0 * size) / self.dev_size)
 
     def print_histogram(self, columns=80, render=RENDER_COUNTS):
-        """ Print an ASCII representation of a histogram and its values,
-            suitable for display on a terminal of at least 'colums'
-            width.
+        """ Print an ASCII representation of an `IOHistogram` and its
+            values, suitable for display on a terminal of at least
+            'colums' width.
+
+            `render` specifies which values to display. It can include the
+            current histogram counts, RENDER_COUNTS, or RENDER_TOTALS.
+
+            FIXME: Plotting both RENDER_COUNTS and RENDER_TOTALS is not
+            recommended since values are not normalized: the values of
+            the totals distribution swamp the current interval.
         """
 
         if render & RENDER_TOTALS:
@@ -507,10 +562,19 @@ class IOHistogram(object):
         print("")
 
     def update_region_map(self):
+        """ Update the map of region_id values to `IOHistogram` bins.
+        """
         index = xrange(len(self.regions))
         self.region_map = dict(zip(self.regions, index))
 
     def update_bin_regions(self, merge=False):
+        """ Update `IOHistogram` bin widths and counts by adapting bins to
+            current IO levels. Bins with counts falling above the current
+            `_threshold` will be split, and their counts and widths
+            distributed. If `merge` is `True` then adjacent bins with both
+            having a count less than `_merge_threshold` will be merged
+            into a single bin.
+        """
         if not self.adapt:
             return
 
@@ -603,6 +667,12 @@ class IOHistogram(object):
         log_verbose(out)
 
     def _create_bin_region(self, start, length):
+        """ Call `dmstats` to create a new region on the bound device,
+            beginning at `start`, and `length` sectors in size.
+
+            Returns the region_id of the newly created region on success,
+            or raises DmstatsException on error.
+        """
         cmd = "dmstats create --start %d --length %d %s"
         cmdstr = cmd % (start, length, self.device)
 
@@ -618,6 +688,13 @@ class IOHistogram(object):
         return int(out.strip().split()[-1])
 
     def create_bin_regions(self):
+        """ Call `dmstats` to create regions on the bound device that
+            correspond to the configured bin boundaries for this
+            `IOHistogram`.
+
+            Returns nothing on success and raises `DmstatsException` on
+            error.
+        """
         start = 0
         regions = []
         for bound in self.bounds:
@@ -627,6 +704,9 @@ class IOHistogram(object):
         self.update_region_map()
 
     def _remove_bin_region(self, region_id):
+        """ Call `dmstats` to delete the specified `region_id` from the
+            bound device.
+        """
         dev_region = (region_id, self.device)
 
         out = _get_cmd_output("dmstats delete --regionid %d %s" % dev_region)
@@ -643,6 +723,9 @@ class IOHistogram(object):
         log_verbose("Removed region_id %d from %s" % dev_region)
 
     def remove_bin_regions(self):
+        """ Remove all regions managed by this `IOHistogram` from the
+            bound device.
+        """
         for region in self.regions:
             self._remove_bin_region(region)
 
@@ -651,6 +734,9 @@ _log_commands = True
 
 
 def _get_cmd_output(cmd):
+    """ Call `cmd` via `Popen` and return the combined `stdout`
+        and `stderr`.
+    """
     args = shlex.split(cmd)
 
     if _log_commands:
@@ -675,10 +761,13 @@ def _get_cmd_output(cmd):
 
 # threshold at which to split a bin in two.
 _threshold = 5000
+# threshold at which to merge two bins together.
 _merge_threshold = 0
 
 
 def _parse_options(args):
+    """ Parse `dmioscope` command line arguments.
+    """
     parser = argparse.ArgumentParser(description="IOScope arguments.")
 
     # positional parameters
@@ -753,11 +842,15 @@ _histograms = []
 
 
 def _remove_all_regions():
+    """ Remove all regions for all `IOHistogram` objects in `_histograms`.
+    """
     for ioh in _histograms:
         ioh.remove_bin_regions()
 
 
 def main(argv):
+    """ Main `dmioscope` routine.
+    """
     global _devices, _histograms, _merge_threshold, _threshold, _verbose
 
     args = _parse_options(argv)
