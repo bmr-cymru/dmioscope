@@ -75,6 +75,12 @@ _test = False
 _verbose = False
 
 
+class DmstatsException(Exception):
+    """ Generic class representing errors communicating with dmstats.
+    """
+    pass
+
+
 def log_info(str):
     print(str)
 
