@@ -805,8 +805,11 @@ if __name__ == '__main__':
     try:
         status = main(sys.argv[1:])
     except KeyboardInterrupt:
-        _remove_all_regions()
         status = 0
+    except DmstatsException:
+        status = 1
+    finally:
+        _remove_all_regions()
 
     sys.exit(status)
 
