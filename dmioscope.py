@@ -345,8 +345,13 @@ class IOHistogram(object):
             fields = line.split(":")
             counters = fields[1:]
             region = int(fields[0])
-            log_verbose("%d: %s" % (region, counters[self.counter]))
 
+            # Skip any non-dmioscope region_id values in the report.
+            if region not in self.region_map.keys():
+                log_verbose("Skipping foreign region %d" % region)
+                continue
+
+            log_verbose("%d: %s" % (region, counters[self.counter]))
             _bin = self.region_map[region]
             value = int(counters[self.counter])
             self.bins[_bin].count = value
