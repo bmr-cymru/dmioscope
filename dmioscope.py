@@ -74,12 +74,6 @@ _test = False
 _verbose = False
 
 
-class DmstatsException(Exception):
-    """ Generic class representing errors communicating with dmstats.
-    """
-    pass
-
-
 def log_info(str):
     print(str)
 
@@ -101,6 +95,177 @@ def _terminal_size():
                                  fcntl.ioctl(0, termios.TIOCGWINSZ,
                                              struct.pack('HHHH', 0, 0, 0, 0)))
     return w, h
+
+def _get_cmd_output(cmd):
+    """ Call `cmd` via `Popen` and return the status and combined `stdout`
+        and `stderr` as a 2-tuple, e.g.:
+
+        (0, "vg00/lvol0: Created new region with 1 area(s) as region ID 5\n")
+
+    """
+    args = shlex.split(cmd)
+
+    if _log_commands:
+        log_verbose("_get_cmd_output('%s')" % cmd)
+
+    try:
+        p = Popen(args, shell=False, stdout=PIPE,
+                  stderr=STDOUT, bufsize=-1, close_fds=True)
+        # stderr will always be None
+        (stdout, stderr) = p.communicate()
+    except OSError as e:
+        log_error("Could not call '%s': %s" % (args[0], e))
+        raise DmstatsException
+
+    if _log_commands or p.returncode != 0:
+        log_verbose(stdout.strip())
+
+    return (p.returncode, stdout)
+
+
+class DmstatsException(Exception):
+    """ Generic class representing errors communicating with dmstats.
+    """
+    pass
+
+# device-mapper executables
+DMSETUP = "dmsetup"
+DMSTATS = "dmstats"
+
+# dmstats command verbs
+DMS_CREATE = "create"
+DMS_DELETE = "delete"
+DMS_REPORT = "report"
+DMS_LIST = "list" # debug
+
+# dmstats command verb argument templates
+DMS_CREATE_ARGS = "--start %d --length %d %s"
+DMS_DELETE_ARGS = "--regionid %d %s"
+DMS_REPORT_ARGS = "--noheadings -o %s %s"
+DMS_LIST_ARGS = ""
+
+
+class DmStats(object):
+    """ Class to encapsulate interaction with device-mapper statistics.
+    """
+
+    # bound device
+    device = None
+    uuid = None
+    major = -1
+    minor = -1
+
+    # command state
+    verb = None
+    args = None
+    status = 0
+
+    def __init__(self, device, uuid=None, major=None, minor=None):
+        """ Initialise a `DmStats` object and bind it to the specified
+            DM device name, UUID, or major/minor pair. An error is logged
+            and a DmstatsException raised if the device does not exist.
+        """
+        info_cmdstr = DMSETUP + " info -c --noheadings -o name "
+        if device:
+            result = _get_cmd_output(info_cmdstr + device)
+        if uuid:
+            self.uuid = uuid
+            device = "with UUID " + uuid
+            result = _get_cmd_output(info_cmdstr + "-u " + uuid)
+        if major and minor:
+            self.major = major
+            self.minor = minor
+            device = "with device no. %d:%d" % (major, minor)
+            maj_min_opt = "-j %d -m %d" % (major, minor)
+            result = _get_cmd_output(info_cmdstr + maj_min_opt)
+        if result[0]:
+            log_error("Error getting device information.")
+            log_error("device %s does not exist" % device)
+            raise DmstatsException
+
+        # canonical dm name
+        self.device = result[1].strip()
+
+    def _issue_command(self):
+        """ Issue the command configured in `verb` and `args`, and return
+            the combined output as a string. The exit status is stored in
+            `status`. Called by command methods.
+        """
+        cmdstr = "%s %s %s" % (DMSTATS, self.verb, self.args)
+        result = _get_cmd_output(cmdstr)
+        self.status = result[0]
+        return result[1]
+
+    def _status(self, message):
+        """ Check the status of the last command and raise a DmstatsException
+            if it is non-zero. The `message` argument specified a message to
+            be logged in the event of error.
+        """
+        if self.status:
+            log_error(message)
+            raise DmstatsException
+
+    def create(self, start, length):
+        """ Call `dmstats` to create a new region on the bound device,
+            beginning at `start`, and `length` sectors in size.
+
+            Returns the region_id of the newly created region on success,
+            or raises DmstatsException on error.
+        """
+        self.verb = DMS_CREATE
+        self.args = DMS_CREATE_ARGS % (start, length, self.device)
+
+        out = self._issue_command()
+
+        self._status("Could not create region on device %s" % self.device)
+
+        region_id = int(out.strip().split()[-1])
+
+        log_verbose("Created region_id %d @ %d length=%d)" %
+                    (region_id, start, length))
+
+        return region_id
+
+    def delete(self, region_id):
+        """ Call `dmstats` to delete the specified `region_id` from the
+            bound device.
+        """
+        dev_region = (region_id, self.device)
+        self.verb = DMS_DELETE
+        self.args = DMS_DELETE_ARGS % dev_region
+
+        self._issue_command()
+
+        self._status("Could not delete region_id %d from %s" % dev_region)
+
+        log_verbose("Removed region_id %d from %s" % dev_region)
+
+    def list(self):
+        """ Call `dmstats` to list the regions present on the bound device.
+        """
+        self.verb = DMS_LIST
+        self.args = DMS_LIST_ARGS
+
+        out = self._issue_command()
+
+        self._status("Could not retrieve region list for device %s." %
+                     self.device)
+
+        return out
+
+    def report(self):
+        """ Call `dmstats` to obtain current counter values for the bound
+            device.
+        """
+        self.verb = DMS_REPORT
+        self.args = DMS_REPORT_ARGS % (_dm_report_fields, self.device)
+
+        out = self._issue_command()
+
+        self._check_status("Could not retrieve counter data for regions "
+                           "on device %s." % self.device)
+
+        return out
 
 
 def _device_sectors(dev_path):
@@ -731,32 +896,6 @@ class IOHistogram(object):
 
 _log_commands = True
 
-
-def _get_cmd_output(cmd):
-    """ Call `cmd` via `Popen` and return the status and combined `stdout`
-        and `stderr` as a 2-tuple, e.g.:
-
-        (0, "vg00/lvol0: Created new region with 1 area(s) as region ID 5\n")
-
-    """
-    args = shlex.split(cmd)
-
-    if _log_commands:
-        log_verbose("_get_cmd_output('%s')" % cmd)
-
-    try:
-        p = Popen(args, shell=False, stdout=PIPE,
-                  stderr=STDOUT, bufsize=-1, close_fds=True)
-        # stderr will always be None
-        (stdout, stderr) = p.communicate()
-    except OSError as e:
-        log_error("Could not call '%s': %s" % (args[0], e))
-        raise DmstatsException
-
-    if _log_commands or p.returncode != 0:
-        log_verbose(stdout.strip())
-
-    return (p.returncode, stdout)
 
 # threshold at which to split a bin in two.
 _threshold = 5000
