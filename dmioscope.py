@@ -376,6 +376,9 @@ class IOHistogram(object):
         log_verbose("Updating %d histogram bins" % self.nr_bins)
         # data contains one row per histogram bin
         for line in data.splitlines():
+            # python3 requires that both operands to String.split() be either
+            # a byte sequence, or a string (but not one or the other).
+            line = line.decode('utf8')
             fields = line.split(":")
             counters = fields[1:]
             region = int(fields[0])
