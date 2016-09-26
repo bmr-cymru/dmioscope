@@ -662,7 +662,7 @@ class IOHistogram(object):
                      len(self.bounds), len(self.regions)))
 
         # Failure to list regions is fatal.
-        out = _get_cmd_output("dmstats list %s" % self.device)
+        out = _get_cmd_output("dmstats list %s" % self.device)[1]
         if not out:
             log_error("Could not retrieve region list for device %s." % dev)
             raise DmstatsException
@@ -680,7 +680,7 @@ class IOHistogram(object):
         cmdstr = cmd % (start, length, self.device)
 
         # Failure to create a region is fatal.
-        out = _get_cmd_output(cmdstr)
+        out = _get_cmd_output(cmdstr)[1]
         if not out:
             log_error("Could not create region on device %s" % self.device)
             raise DmstatsException
@@ -712,16 +712,11 @@ class IOHistogram(object):
         """
         dev_region = (region_id, self.device)
 
-        out = _get_cmd_output("dmstats delete --regionid %d %s" % dev_region)
-        # FIXME: 'dmstats delete' produces no output by default (maybe it
-        # should?), meaning with the current _get_command_output() there is
-        # no way to distinguish this from an error running the command.
-        #
-        # For now this is not so important: a systemic problem (e.g. libs
-        # incompatible) will cause errors long before reaching this point.
-        #
-        # if not out:
-        #     raise DmstatsException
+        result = _get_cmd_output("dmstats delete --regionid %d %s" %
+                                 dev_region)
+        if result[0]:
+            log_error("Could not delete region_id %d from %s" % dev_region)
+            raise DmstatsException
 
         log_verbose("Removed region_id %d from %s" % dev_region)
 
@@ -738,8 +733,11 @@ _log_commands = True
 
 
 def _get_cmd_output(cmd):
-    """ Call `cmd` via `Popen` and return the combined `stdout`
-        and `stderr`.
+    """ Call `cmd` via `Popen` and return the status and combined `stdout`
+        and `stderr` as a 2-tuple, e.g.:
+
+        (0, "vg00/lvol0: Created new region with 1 area(s) as region ID 5\n")
+
     """
     args = shlex.split(cmd)
 
@@ -758,10 +756,7 @@ def _get_cmd_output(cmd):
     if _log_commands or p.returncode != 0:
         log_verbose(stdout.strip())
 
-    if p.returncode != 0:
-        return None
-
-    return stdout
+    return (p.returncode, stdout)
 
 # threshold at which to split a bin in two.
 _threshold = 5000
@@ -910,7 +905,7 @@ def main(argv):
             cmdstr = _dm_report_cmd + _dm_report_fields + " %s" % dev
 
             # Failure to retrieve region data is fatal.
-            out = _get_cmd_output(cmdstr)
+            out = _get_cmd_output(cmdstr)[1]
             if not out:
                 log_error("Could not retrieve counter data for regions "
                           "on device %s." % dev)
