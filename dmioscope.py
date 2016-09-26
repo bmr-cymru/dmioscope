@@ -974,6 +974,11 @@ def main(argv):
     args = _parse_options(argv)
 
     interval = args.interval
+
+    if interval < 1:
+        log_error("interval must be equal to or greater than 1.")
+        return 1
+
     count = args.count
     clear = args.clear
 
