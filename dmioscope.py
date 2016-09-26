@@ -74,18 +74,22 @@ _test = False
 _verbose = False
 
 
-def log_info(str):
-    print(str)
+def log_info(msg):
+    print(msg)
 
 
-def log_verbose(str):
+def log_verbose(msg):
     if not _verbose:
         return
-    print(str)
+    print(msg)
 
 
-def log_error(str):
-    print(str, file=sys.stderr)
+def log_warn(msg):
+    print("WARNING: " + msg, file=sys.stderr)
+
+
+def log_error(msg):
+    print(msg, file=sys.stderr)
 
 
 def _terminal_size():
@@ -95,6 +99,7 @@ def _terminal_size():
                                  fcntl.ioctl(0, termios.TIOCGWINSZ,
                                              struct.pack('HHHH', 0, 0, 0, 0)))
     return w, h
+
 
 def _get_cmd_output(cmd):
     """ Call `cmd` via `Popen` and return the status and combined `stdout`
