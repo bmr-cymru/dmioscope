@@ -214,8 +214,8 @@ class Bin(object):
     def split(self):
         """ Split the count of this bin uniformly in two.
         """
-        self.count /= 2
-        self.width /= 2
+        self.count = int(self.count / 2)
+        self.width = int(self.width / 2)
         return Bin(self.start + self.width, self.width, count=self.count)
 
 
