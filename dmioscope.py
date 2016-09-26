@@ -44,7 +44,7 @@
 #                          Specify the maximum terminal width to use.
 #
 from __future__ import print_function
-
+from builtins import range
 from subprocess import Popen, PIPE, STDOUT
 import argparse
 import shlex
@@ -275,8 +275,8 @@ class IOHistogram(object):
             return None
 
         step = self.dev_size / nr_regions
-
-        bounds = [x for x in xrange(step, self.dev_size + 1, step)]
+        step = int(step)
+        bounds = [x for x in range(step, self.dev_size + 1, step)]
         log_verbose(bounds)
         return bounds
 
@@ -395,7 +395,7 @@ class IOHistogram(object):
         """ Generate simple test data to update an `IOHistogram`.
         """
         data = ""
-        for i in xrange(self.nr_bins):
+        for i in range(self.nr_bins):
             data += "%d:%d\n" % (i, i)
         self.update(data)
 
@@ -543,7 +543,7 @@ class IOHistogram(object):
 
             scale = _bin.width / row_width
             label = _sizeof_fmt(_bin.start << 9)
-            for step in xrange(scale):
+            for step in range(int(scale)):
                 row = label + (1 + (x_label_width - len(label))) * " " + vbar
                 row += int((_bin.count * counts_per_char) / scale) * "#"
                 if _tot:
@@ -564,7 +564,7 @@ class IOHistogram(object):
     def update_region_map(self):
         """ Update the map of region_id values to `IOHistogram` bins.
         """
-        index = xrange(len(self.regions))
+        index = range(len(self.regions))
         self.region_map = dict(zip(self.regions, index))
 
     def update_bin_regions(self, merge=False):
