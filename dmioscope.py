@@ -956,14 +956,14 @@ def _parse_options(args):
     return parser.parse_args()
 
 _devices = []
-_histograms = []
+_histograms = {}
 
 
 def _remove_all_regions():
     """ Remove all regions for all `IOHistogram` objects in `_histograms`.
     """
-    for ioh in _histograms:
-        ioh.remove_bin_regions()
+    for dev in _devices:
+        _histograms[dev].remove_bin_regions()
 
 
 def main(argv):
@@ -1010,7 +1010,7 @@ def main(argv):
     for dev in _devices:
         ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt)
         ioh.create_bin_regions()
-        _histograms.append(ioh)
+        _histograms[dev] = ioh
 
     start_time = time.time()
 
@@ -1025,11 +1025,14 @@ def main(argv):
         if clear:
             print(CLEAR_SCREEN)
 
+        report_cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
+
         for dev in _devices:
-            cmdstr = _dm_report_cmd + _dm_report_fields + " %s" % dev
+            report_cmd = report_cmdstr % dev
+            ioh = _histograms[dev]
 
             # Failure to retrieve region data is fatal.
-            out = _get_cmd_output(cmdstr)[1]
+            out = _get_cmd_output(report_cmd)[1]
             if not out:
                 log_error("Could not retrieve counter data for regions "
                           "on device %s." % dev)
