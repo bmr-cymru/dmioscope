@@ -408,6 +408,9 @@ class IOHistogram(object):
     totals = None
     region_map = dict()
 
+    # Handle to communicate with dmstats
+    _dms = None
+
     def _init_bins(self):
         self.bins = []
         self.totals = []
@@ -472,6 +475,7 @@ class IOHistogram(object):
             0..1M, 1M..2M,2M..3M, and 3M..4M, tracking the READS_COUNT
             counter.
         """
+        self._dms = DmStats(device)
         self.device = device
         self.bounds = bounds
         log_verbose(self.bounds)
@@ -509,6 +513,7 @@ class IOHistogram(object):
             Will create an adaptive histogram with eight bins and binds
             it to the READS_COUNT counter.
         """
+        self._dms = DmStats(device)
         self.device = device
 
         self.dev_size = _device_sectors(self.device)
@@ -826,12 +831,7 @@ class IOHistogram(object):
                     (len(self.bins), len(self.totals),
                      len(self.bounds), len(self.regions)))
 
-        # Failure to list regions is fatal.
-        out = _get_cmd_output("dmstats list %s" % self.device)[1]
-        if not out:
-            log_error("Could not retrieve region list for device %s." % dev)
-            raise DmstatsException
-
+        out = self._dms.list()
         log_verbose(out)
 
     def _create_bin_region(self, start, length):
@@ -841,19 +841,7 @@ class IOHistogram(object):
             Returns the region_id of the newly created region on success,
             or raises DmstatsException on error.
         """
-        cmd = "dmstats create --start %d --length %d %s"
-        cmdstr = cmd % (start, length, self.device)
-
-        # Failure to create a region is fatal.
-        out = _get_cmd_output(cmdstr)[1]
-        if not out:
-            log_error("Could not create region on device %s" % self.device)
-            raise DmstatsException
-
-        log_verbose("Created region_id %d @ %d length=%d)" %
-                    (int(out.strip().split()[-1]), start, length))
-
-        return int(out.strip().split()[-1])
+        return self._dms.create(start, length)
 
     def create_bin_regions(self):
         """ Call `dmstats` to create regions on the bound device that
@@ -875,15 +863,7 @@ class IOHistogram(object):
         """ Call `dmstats` to delete the specified `region_id` from the
             bound device.
         """
-        dev_region = (region_id, self.device)
-
-        result = _get_cmd_output("dmstats delete --regionid %d %s" %
-                                 dev_region)
-        if result[0]:
-            log_error("Could not delete region_id %d from %s" % dev_region)
-            raise DmstatsException
-
-        log_verbose("Removed region_id %d from %s" % dev_region)
+        return self._dms.delete(region_id)
 
     def remove_bin_regions(self):
         """ Remove all regions managed by this `IOHistogram` from the
