@@ -253,12 +253,12 @@ class DmStats(object):
 
         return out
 
-    def report(self):
+    def report(self, fields=_dm_report_fields):
         """ Call `dmstats` to obtain current counter values for the bound
             device.
         """
         self.verb = DMS_REPORT
-        self.args = DMS_REPORT_ARGS % (_dm_report_fields, self.device)
+        self.args = DMS_REPORT_ARGS % (fields, self.device)
 
         out = self._issue_command()
 
