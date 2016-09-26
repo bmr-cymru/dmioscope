@@ -262,8 +262,8 @@ class DmStats(object):
 
         out = self._issue_command()
 
-        self._check_status("Could not retrieve counter data for regions "
-                           "on device %s." % self.device)
+        self._status("Could not retrieve counter data for regions "
+                      "on device %s." % self.device)
 
         return out
 
