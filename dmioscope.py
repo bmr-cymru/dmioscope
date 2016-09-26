@@ -731,6 +731,7 @@ class IOHistogram(object):
         """
         for region in self.regions:
             self._remove_bin_region(region)
+        self.regions = []
 
 
 _log_commands = True
@@ -927,8 +928,6 @@ def main(argv):
             ioh.update_bin_regions(merge=merge)
 
             count -= 1
-
-    _remove_all_regions()
 
 if __name__ == '__main__':
     try:
