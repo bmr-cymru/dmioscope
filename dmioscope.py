@@ -534,7 +534,7 @@ class IOHistogram(object):
         log_info("Initialised %s %s histogram with %d bins, min_size=%d."
                  % (_counters[counter], hist_type, nr_bins, self.min_size))
 
-    def update(self, data, test=False):
+    def update(self, test=False):
         """ Populate or update the histogram using the string counter
             values in `data`. The current value of the histogram is set
             to the counter values in `data` and this is added to the
@@ -542,6 +542,8 @@ class IOHistogram(object):
         """
         if test:
             return self._test_update()
+
+        data = self._dms.report()
 
         log_verbose("Updating %d histogram bins" % self.nr_bins)
         # data contains one row per histogram bin
@@ -1025,20 +1027,9 @@ def main(argv):
         if clear:
             print(CLEAR_SCREEN)
 
-        report_cmdstr = _dm_report_cmd + _dm_report_fields + " %s"
-
         for dev in _devices:
-            report_cmd = report_cmdstr % dev
             ioh = _histograms[dev]
-
-            # Failure to retrieve region data is fatal.
-            out = _get_cmd_output(report_cmd)[1]
-            if not out:
-                log_error("Could not retrieve counter data for regions "
-                          "on device %s." % dev)
-                raise DmstatsException
-
-            ioh.update(out, test=_test)
+            ioh.update(test=_test)
 
             if args.summary:
                 print("%s: accumulated IO distribution" % dev)
