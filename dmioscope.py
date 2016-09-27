@@ -15,8 +15,9 @@
 #
 # Usage:
 #
-#  dmioscope.py [-h] [-a] [-b NR_BINS] [-c] [-n] [-p] [-r ROWS] [-s]
-#                      [-t THRESH] [-v] [-w WIDTH]
+#  dmioscope.py [-h] [-a] [-b NR_BINS] [--clear] [-C COUNTERS] [-c] [-m]
+#                      [-M MERGE_THRESH] [-n] [-r ROWS] [-s] [-t THRESH] [-v]
+#                      [-w WIDTH]
 #                      [interval] [count] dev [dev ...]
 #
 #  IOScope arguments.
@@ -31,9 +32,20 @@
 #    -a, --adaptive        Adapt the number of bins to observed IO volume.
 #    -b NR_BINS, --bins NR_BINS
 #                          Divide devices into nr equally sized bins.
+#    --clear               Clear the screen before each update.
+#    -C COUNTERS, --counters COUNTERS
+#                          Specify the dmstats counter fields to monitor
+#                          (QUEUE_TICKS, READ_TICKS, READS_MERGED, WRITE_TIME,
+#                          IN_PROGRESS, READ_SECTORS, WRITE_TICKS, WRITES_MERGES,
+#                          WRITES, WRITE_SECTORS, READ_TIME, READS, IO_TICKS)
 #    -c, --current         Show the current interval plot.
-#    -n, --no-adaptive     Do not adapt the number of bins according to
-#                          observed IO volume.
+#    -m, --merge           Allow merging of bins with low IO volume in adaptive
+#                          mode.
+#    -M MERGE_THRESH, --merge-threshold MERGE_THRESH
+#                          Threshold at which to merge adjacent regions with low
+#                          IO.
+#    -n, --no-adaptive     Do not adapt the number of bins according to observed
+#                          IO volume.
 #    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
 #    -s, --summary         Show the accumulated summary plot.
 #    -t THRESH, --threshold THRESH
@@ -56,17 +68,6 @@ import time
 import fcntl
 import struct
 import termios
-
-_dm_report_fields = "region_id,read_count,write_count"
-_dm_report_cmd = "dmstats report --noheadings -o"
-
-READS_COUNT = 0
-WRITES_COUNT = 1
-
-_counters = [
-    "READS_COUNT",
-    "WRITES_COUNT"
-]
 
 CLEAR_SCREEN = "\033c"
 
@@ -258,7 +259,7 @@ class DmStats(object):
 
         return out
 
-    def report(self, fields=_dm_report_fields):
+    def report(self, fields="region_id,read_count"):
         """ Call `dmstats` to obtain current counter values for the bound
             device.
         """
@@ -960,6 +961,10 @@ _merge_threshold = 0
 def _parse_options(args):
     """ Parse `dmioscope` command line arguments.
     """
+
+    # list of field names for -C/--counter
+    counter_fields = ", ".join(_dmstats_counters.keys())
+
     parser = argparse.ArgumentParser(description="IOScope arguments.")
 
     # positional parameters
@@ -989,6 +994,10 @@ def _parse_options(args):
     parser.add_argument("--clear", action="store_true",
                         dest="clear", default=False, help="Clear the screen "
                         "before each update.")
+
+    parser.add_argument("-C", "--counters", action="store", dest="counters",
+                        type=str, default="READS", help="Specify the dmstats "
+                        "counter fields to monitor (%s)" % counter_fields)
 
     parser.add_argument("-c", "--current", action="store_true",
                         dest="current", default=True,
@@ -1067,6 +1076,8 @@ def main(argv):
 
     nr_bins = args.bins
 
+    counters = args.counters
+
     if not args.width or not args.rows:
         (w, h) = _terminal_size()
         width = w if not args.width else args.width
@@ -1083,7 +1094,7 @@ def main(argv):
         count = -1
 
     for dev in _devices:
-        ioh = IOHistogram(dev, READS_COUNT, initial_bins=nr_bins, adapt=adapt)
+        ioh = IOHistogram(dev, counters, initial_bins=nr_bins, adapt=adapt)
         ioh.create_bin_regions()
         _histograms[dev] = ioh
 

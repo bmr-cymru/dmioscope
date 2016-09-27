@@ -129,9 +129,9 @@ Or by first making it executable with `chmod`:
 =====================================
 
 ```
-usage: dmioscope.py [-h] [-a] [-b NR_BINS] [--clear] [-c] [-m]
-                    [-M MERGE_THRESH] [-n] [-p] [-r ROWS] [-s]
-                    [-t THRESH] [-v] [-w WIDTH]
+dmioscope.py [-h] [-a] [-b NR_BINS] [--clear] [-C COUNTERS] [-c] [-m]
+                    [-M MERGE_THRESH] [-n] [-r ROWS] [-s] [-t THRESH] [-v]
+                    [-w WIDTH]
                     [interval] [count] dev [dev ...]
 
 IOScope arguments.
@@ -147,6 +147,11 @@ optional arguments:
   -b NR_BINS, --bins NR_BINS
                         Divide devices into nr equally sized bins.
   --clear               Clear the screen before each update.
+  -C COUNTERS, --counters COUNTERS
+                        Specify the dmstats counter fields to monitor
+                        (QUEUE_TICKS, READ_TICKS, READS_MERGED, WRITE_TIME,
+                        IN_PROGRESS, READ_SECTORS, WRITE_TICKS, WRITES_MERGES,
+                        WRITES, WRITE_SECTORS, READ_TIME, READS, IO_TICKS)
   -c, --current         Show the current interval plot.
   -m, --merge           Allow merging of bins with low IO volume in adaptive
                         mode.
@@ -155,7 +160,6 @@ optional arguments:
                         IO.
   -n, --no-adaptive     Do not adapt the number of bins according to observed
                         IO volume.
-  -p, --percent         Show distribution values as percentages.
   -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
   -s, --summary         Show the accumulated summary plot.
   -t THRESH, --threshold THRESH
@@ -165,4 +169,3 @@ optional arguments:
   -w WIDTH, --width WIDTH
                         Specify the maximum terminal width to use.
 ```
-
