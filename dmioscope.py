@@ -1037,7 +1037,8 @@ def _remove_all_regions():
     """ Remove all regions for all `IOHistogram` objects in `_histograms`.
     """
     for dev in _devices:
-        _histograms[dev].remove_bin_regions()
+        if dev in _histograms:
+            _histograms[dev].remove_bin_regions()
 
 
 def main(argv):
