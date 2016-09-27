@@ -808,8 +808,9 @@ class IOHistogram(object):
         # points = [50.0, 66.6, 75.0, 90.0, 95.0, 99.0]
         points = [90.0]
         for point in points:
+            total = True if render & RENDER_TOTALS else False
             print("%.2f%% of IO reaches %.2f%% of disk."
-                  % (point, self.io_distribution(point, total=False)))
+                  % (point, self.io_distribution(point, total=total)))
         print("")
 
     def update_region_map(self):
