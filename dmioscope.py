@@ -74,6 +74,9 @@ CLEAR_SCREEN = "\033c"
 _test = False
 _verbose = False
 
+_version_major = 0
+_version_minor = 1
+_version_str = "%d.%d" % (_version_major, _version_minor)
 
 def log_info(msg):
     print(msg)
@@ -1032,6 +1035,10 @@ def _parse_options(args):
                         dest="verbose", default=False, help="Enable verbose "
                         "debugging messages.")
 
+    parser.add_argument("-V", "--version", action="store_true",
+                        dest="version", default=False, help="Print version "
+                        "information and exit.")
+
     parser.add_argument("-w", "--width", action="store", type=int,
                         dest="width", default=None, help="Specify the maximum "
                         "terminal width to use.")
@@ -1049,6 +1056,9 @@ def _remove_all_regions():
         if dev in _histograms:
             _histograms[dev].remove_bin_regions()
 
+def _version():
+    log_info("DM IOScope version: %s" % _version_str)
+    return 0
 
 def main(argv):
     """ Main `dmioscope` routine.
@@ -1056,6 +1066,9 @@ def main(argv):
     global _devices, _histograms, _merge_threshold, _threshold, _verbose
 
     args = _parse_options(argv)
+
+    if args.version:
+        return _version()
 
     if not args.devices:
         log_error("No device(s) specified.")
