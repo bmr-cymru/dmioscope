@@ -141,7 +141,7 @@ DMSTATS = "dmstats"
 DMS_CREATE = "create"
 DMS_DELETE = "delete"
 DMS_REPORT = "report"
-DMS_LIST = "list" # debug
+DMS_LIST = "list"
 
 # dmstats command verb argument templates
 DMS_CREATE_ARGS = "--start %d --length %d %s"
@@ -268,7 +268,7 @@ class DmStats(object):
         out = self._issue_command()
 
         self._status("Could not retrieve counter data for regions "
-                      "on device %s." % self.device)
+                     "on device %s." % self.device)
 
         return out
 
