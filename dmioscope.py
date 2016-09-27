@@ -975,18 +975,22 @@ def _parse_options(args):
     parser.add_argument("count", metavar="count", nargs="?", default=1,
                         help="Number of intervals to report.", type=int)
 
-    parser.add_argument("devices", metavar="dev", nargs="+",
+    parser.add_argument("devices", metavar="dev", nargs="*",
                         help="Device(s) to monitor.")
 
-    # argument groups
+    # adaptation argument group
 
-    adaptp = parser.add_mutually_exclusive_group(required=False)
+    agroup = parser.add_mutually_exclusive_group(required=False)
 
-    # switches and options
-    adaptp.add_argument("-a", "--adaptive", action="store_true",
+    agroup.add_argument("-a", "--adaptive", action="store_true",
                         dest="adaptive", default=True,
                         help="Adapt the number of bins to observed IO volume.")
 
+    agroup.add_argument("-n", "--no-adaptive", action="store_false",
+                        dest="adaptive", help="Do not adapt the number of bins"
+                        " according to observed IO volume.")
+
+    # switches and options
     parser.add_argument("-b", "--bins", action="store", type=int,
                         dest="bins", metavar="NR_BINS", default=1,
                         help="Divide devices into nr equally sized bins.")
@@ -1011,10 +1015,6 @@ def _parse_options(args):
                         dest="merge_thresh", default=0, help="Threshold at "
                               "which to merge adjacent regions with low IO.",
                         metavar="MERGE_THRESH")
-
-    adaptp.add_argument("-n", "--no-adaptive", action="store_false",
-                        dest="adaptive", help="Do not adapt the number of bins"
-                        " according to observed IO volume.")
 
     parser.add_argument("-r", "--rows", action="store", type=int,
                         dest="rows", default=None, help="Specify the maxumum "
@@ -1056,6 +1056,10 @@ def main(argv):
     global _devices, _histograms, _merge_threshold, _threshold, _verbose
 
     args = _parse_options(argv)
+
+    if not args.devices:
+        log_error("No device(s) specified.")
+        return 1
 
     interval = args.interval
 
