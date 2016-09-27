@@ -198,7 +198,7 @@ class DmStats(object):
             `status`. Called by command methods.
         """
         cmdstr = "%s %s %s" % (DMSTATS, self.verb, self.args)
-        result = _get_cmd_output(cmdstr)
+        result = _get_cmd_output(cmdstr.strip())
         self.status = result[0]
         return result[1]
 
