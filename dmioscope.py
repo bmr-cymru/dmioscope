@@ -121,7 +121,7 @@ def _get_cmd_output(cmd):
         (stdout, stderr) = p.communicate()
     except OSError as e:
         log_error("Could not call '%s': %s" % (args[0], e))
-        raise DmstatsException
+        raise DmStatsException
 
     if _log_commands or p.returncode != 0:
         log_verbose(stdout.strip())
@@ -129,7 +129,7 @@ def _get_cmd_output(cmd):
     return (p.returncode, stdout)
 
 
-class DmstatsException(Exception):
+class DmStatsException(Exception):
     """ Generic class representing errors communicating with dmstats.
     """
     pass
@@ -169,7 +169,7 @@ class DmStats(object):
     def __init__(self, device, uuid=None, major=None, minor=None):
         """ Initialise a `DmStats` object and bind it to the specified
             DM device name, UUID, or major/minor pair. An error is logged
-            and a DmstatsException raised if the device does not exist.
+            and a DmStatsException raised if the device does not exist.
         """
         info_cmdstr = DMSETUP + " info -c --noheadings -o name "
         if device:
@@ -187,7 +187,7 @@ class DmStats(object):
         if result[0]:
             log_error("Error getting device information.")
             log_error("device %s does not exist" % device)
-            raise DmstatsException
+            raise DmStatsException
 
         # canonical dm name
         self.device = result[1].strip()
@@ -203,20 +203,20 @@ class DmStats(object):
         return result[1]
 
     def _status(self, message):
-        """ Check the status of the last command and raise a DmstatsException
+        """ Check the status of the last command and raise a DmStatsException
             if it is non-zero. The `message` argument specified a message to
             be logged in the event of error.
         """
         if self.status:
             log_error(message)
-            raise DmstatsException
+            raise DmStatsException
 
     def create(self, start, length):
         """ Call `dmstats` to create a new region on the bound device,
             beginning at `start`, and `length` sectors in size.
 
             Returns the region_id of the newly created region on success,
-            or raises DmstatsException on error.
+            or raises DmStatsException on error.
         """
         self.verb = DMS_CREATE
         self.args = DMS_CREATE_ARGS % (start, length, self.device)
@@ -315,7 +315,7 @@ class DmStatsCounters(object):
         for counter in counters.split(","):
             if counter not in _dmstats_counters:
                 log_error("Unknown dmstats counter: %s" % counter)
-                raise DmstatsException
+                raise DmStatsException
             if counter in self.counters:
                 log_warn("Counter %s specified twice." % counter)
             self.counters.add(counter)
@@ -914,7 +914,7 @@ class IOHistogram(object):
             beginning at `start`, and `length` sectors in size.
 
             Returns the region_id of the newly created region on success,
-            or raises DmstatsException on error.
+            or raises DmStatsException on error.
         """
         return self._dms.create(start, length)
 
@@ -923,7 +923,7 @@ class IOHistogram(object):
             correspond to the configured bin boundaries for this
             `IOHistogram`.
 
-            Returns nothing on success and raises `DmstatsException` on
+            Returns nothing on success and raises `DmStatsException` on
             error.
         """
         start = 0
@@ -1131,7 +1131,7 @@ if __name__ == '__main__':
         status = main(sys.argv[1:])
     except KeyboardInterrupt:
         status = 0
-    except DmstatsException:
+    except DmStatsException:
         status = 1
     finally:
         _remove_all_regions()
