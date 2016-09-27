@@ -520,7 +520,7 @@ class IOHistogram(object):
         log_verbose(bounds)
         return bounds
 
-    def __init__(self, device, counter, bounds, adapt=True):
+    def __init__(self, device, counters, bounds, adapt=True):
         """ Initialise an `IOHistogram` for `device`, using the sector
             boundaries listed in `bounds`, and bind it to the dmstats
             counter specified by `counter`.
@@ -548,6 +548,7 @@ class IOHistogram(object):
             counter.
         """
         self._dms = DmStats(device)
+        self._counters = DmStatsCounters(counters)
         self.device = device
         self.bounds = bounds
         log_verbose(self.bounds)
@@ -558,11 +559,11 @@ class IOHistogram(object):
         self.min_size = self.dev_size / _min_size_fraction
 
         nr_bins = self._init_bins()
-        self.counter = counter
-        log_info("Initialised %s histogram with %d bins, min_size=%d."
-                 % (_counters[counter], nr_bins, self.min_size))
 
-    def __init__(self, device, counter, initial_bins=1, adapt=True):
+        log_info("Initialised %s histogram with %d bins, min_size=%d."
+                 % (self._counters, nr_bins, self.min_size))
+
+    def __init__(self, device, counters, initial_bins=1, adapt=True):
         """ Initialise an IOHistogram with `inital_bins` bins, evenly
             spaced across the specified `device`.
 
@@ -586,6 +587,7 @@ class IOHistogram(object):
             it to the READS_COUNT counter.
         """
         self._dms = DmStats(device)
+        self._counters = DmStatsCounters(counters)
         self.device = device
 
         self.dev_size = _device_sectors(self.device)
@@ -604,7 +606,15 @@ class IOHistogram(object):
             hist_type = "fixed"
 
         log_info("Initialised %s %s histogram with %d bins, min_size=%d."
-                 % (_counters[counter], hist_type, nr_bins, self.min_size))
+                 % (self._counters, hist_type, nr_bins, self.min_size))
+
+    def _test_update(self):
+        """ Generate simple test data to update an `IOHistogram`.
+        """
+        data = ""
+        for i in range(self.nr_bins):
+            data += "%d:%d\n" % (i, i)
+        self.update(data)
 
     def update(self, test=False):
         """ Populate or update the histogram using the string counter
@@ -615,36 +625,26 @@ class IOHistogram(object):
         if test:
             return self._test_update()
 
-        data = self._dms.report()
+        data = self._dms.report(fields=self._counters.fields())
 
         log_verbose("Updating %d histogram bins" % self.nr_bins)
-        # data contains one row per histogram bin
-        for line in data.splitlines():
-            # python3 requires that both operands to String.split() be either
-            # a byte sequence, or a string (but not one or the other).
-            line = line.decode('utf8')
-            fields = line.split(":")
-            counters = fields[1:]
-            region = int(fields[0])
+        # data contains one row per histogram bin. Since python3 requires
+        # that both operands to .split() be a string or a byte sequence
+        # (but not one of each), decode the data read from the dmstats
+        # pipe according to the utf8 codec.
+        for line in data.decode('utf8').splitlines():
+            (region, value) = self._counters.extract(line)
 
             # Skip any non-dmioscope region_id values in the report.
             if region not in self.region_map.keys():
                 log_verbose("Skipping foreign region %d" % region)
                 continue
 
-            log_verbose("%d: %s" % (region, counters[self.counter]))
+            log_verbose("%d: %s=%d" % (region, self._counters, value))
+
             _bin = self.region_map[region]
-            value = int(counters[self.counter])
             self.bins[_bin].count = value
             self.totals[_bin].count += value
-
-    def _test_update(self):
-        """ Generate simple test data to update an `IOHistogram`.
-        """
-        data = ""
-        for i in range(self.nr_bins):
-            data += "%d:%d\n" % (i, i)
-        self.update(data)
 
     def min_width(self):
         """ Return width of the smallest bin in this `IOHistogram`.
