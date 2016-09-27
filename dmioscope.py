@@ -272,6 +272,73 @@ class DmStats(object):
 
         return out
 
+_dmstats_counters = {
+    "READS": "read_count",
+    "READS_MERGED": "reads_merged_count",
+    "READ_SECTORS": "read_sector_count",
+    "READ_TIME": "read_time",
+    "READ_TICKS": "read_ticks",
+    "WRITES": "write_count",
+    "WRITES_MERGES": "writes_merged",
+    "WRITE_SECTORS": "write_sector_count",
+    "WRITE_TIME": "write_time",
+    "WRITE_TICKS": "write_ticks",
+    "IN_PROGRESS": "in_progress_count",
+    "IO_TICKS": "io_ticks",
+    "QUEUE_TICKS": "queue_ticks"
+}
+
+
+class DmStatsCounters(object):
+    """ Device-mapper statistics counter data.
+    """
+    counters = None
+
+    def __init__(self, counters):
+        """ Initialise a `DmStats` object with the specified list of fields.
+        """
+        self.counters = set()
+        self._parse_counters(counters)
+
+    def __repr__(self):
+        """ Return a string represenatation of this `DmStatsCounters` object.
+            This representation is identical to that parsed by the class
+            constructor and can be used for display, or to initialise a new
+            DmStatsCounters object.
+        """
+        if not self.counters:
+            return ""
+        return ",".join(list(self.counters))
+
+    def _parse_counters(self, counters):
+        for counter in counters.split(","):
+            if counter not in _dmstats_counters:
+                log_error("Unknown dmstats counter: %s" % counter)
+                raise DmstatsException
+            if counter in self.counters:
+                log_warn("Counter %s specified twice." % counter)
+            self.counters.add(counter)
+
+    def fields(self):
+        """ Return a comma-separated string list of field names, in the
+            format expected by `dmstats report -o`.
+        """
+        # region_id is always the 0th field
+        fields = ["region_id"] + [_dmstats_counters[c] for c in self.counters]
+        return ",".join(fields)
+
+    def extract(self, data):
+        """ Extract the sum of this `DmStatsCounters` object's counter
+            selection from the report row data passed in `data` and return
+            the value as an integer. The report must use `--noheadings` with
+            the default (':') field delimiter, and with the field
+            specification returned by this object's `fields()` method.
+        """
+        fields = data.split(":")
+        region = int(fields[0])
+        counters = map(int, fields[1:])
+        return (region, sum(counters))
+
 
 def _device_sectors(dev_path):
     """ Return device size in 512b sectors.
