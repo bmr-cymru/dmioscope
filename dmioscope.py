@@ -474,11 +474,14 @@ class Logger(object):
 
     def __init__(self, output):
         self.output = output
-        try:
-            self.file = open(output, "w")
-        except Exception as e:
-            raise LoggerException("Could not open %s for writing: %s" %
-                                  (output, e))
+        if output == "-":
+            self.file = sys.stdout
+        else:
+            try:
+                self.file = open(output, "w")
+            except Exception as e:
+                raise LoggerException("Could not open %s for writing: %s" %
+                                      (output, e))
 
     def log_header(self, ios):
         """ Log a header for the given `IOScope`.
@@ -493,6 +496,8 @@ class Logger(object):
     def close(self):
         """ Close files and release resources associated with this Logger.
         """
+        if self.output == "-":
+            return
         try:
             self.file.close()
         except Exception as e:
