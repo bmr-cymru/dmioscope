@@ -36,16 +36,17 @@
 #    -C COUNTERS, --counters COUNTERS
 #                          Specify the dmstats counter fields to monitor
 #                          (QUEUE_TICKS, READ_TICKS, READS_MERGED, WRITE_TIME,
-#                          IN_PROGRESS, READ_SECTORS, WRITE_TICKS, WRITES_MERGES,
-#                          WRITES, WRITE_SECTORS, READ_TIME, READS, IO_TICKS)
+#                          IN_PROGRESS, READ_SECTORS, WRITE_TICKS,
+#                          WRITES_MERGES, WRITES, WRITE_SECTORS, READ_TIME,
+#                          READS, IO_TICKS)
 #    -c, --current         Show the current interval plot.
 #    -m, --merge           Allow merging of bins with low IO volume in adaptive
 #                          mode.
 #    -M MERGE_THRESH, --merge-threshold MERGE_THRESH
-#                          Threshold at which to merge adjacent regions with low
-#                          IO.
-#    -n, --no-adaptive     Do not adapt the number of bins according to observed
-#                          IO volume.
+#                          Threshold at which to merge adjacent regions with
+#                          low IO.
+#    -n, --no-adaptive     Do not adapt the number of bins according to
+#                          observed IO volume.
 #    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
 #    -s, --summary         Show the accumulated summary plot.
 #    -t THRESH, --threshold THRESH
