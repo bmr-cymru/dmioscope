@@ -433,6 +433,85 @@ def _sizeof_fmt(num, suffix='B'):
     return "%.1f%s%s" % (num, 'Yi', suffix)
 
 
+class LoggerException(Exception):
+    """ Class to represent errors logging data to a file.
+    """
+    message = None
+
+    def __init__(self, message):
+        self.message = message
+
+    def __repr__(self):
+        return self.message
+
+# file separator
+DOT = os.extsep
+
+
+class Logger(object):
+    """ Abstract class representing a data logger.
+        Logger implementations should implement the `log_header`, `log`,
+        and 'close', instance methods, and 'probe' class method.
+
+        The `probe` method must return `True` when its `ext` argument
+        matches the expected file extension for the format type.
+
+        The `log` and `log_header` methods receive an IOScope instance and
+        may interrogate it in any way to produce the required output. The
+        `log_header` method should log sufficient information (particularly
+        bin widths) to interpret data subsequently logged with `log`.
+
+        After calling `close` on a `Logger` object any files used by that
+        object should be closed and the object should be in a state ready
+        to be garbage-collected. No further data should be written with
+        either `log`, or `log_header`.
+    """
+
+    output = None
+
+    def __init__(self, output):
+        """ Initialise a Logger object.
+        """
+        raise LoggerException("Attempt to construct abstract Logger class.")
+
+    def log_header(self, ios):
+        """ Log a header for the given `IOScope`.
+        """
+        raise LoggerException("Attempt to log to abstract Logger class.")
+
+    def log(self, ios):
+        """ Log a set of data points for the given `IOScope`.
+        """
+        raise LoggerException("Attempt to log to abstract Logger class.")
+
+    def close(self):
+        raise LoggerException("Attempt to close abstract Logger class.")
+
+    def probe(self, ext):
+        raise LoggerException("Attempt to probe abstract Logger class.")
+
+    @classmethod
+    def make_logger(self, output, form):
+        """ Build a logger object for the specified output file and format.
+            If `output` does not include a format extension one must be
+            provided in the `form` argument.
+        """
+        if DOT not in output:
+            extension = form
+        else:
+            try:
+                (name, extension) = output.rsplit(DOT, 1)
+            except:
+                raise LoggerException("Malformed file name: %s" % output)
+
+        for logger in _loggers:
+            if logger.probe(extension):
+                return logger(output)
+
+
+_loggers = [CSVLogger, JSONLogger]
+
+
 class Bin(object):
     """ A histogram bin.
 
@@ -485,9 +564,14 @@ class IOScope(object):
     bins = None
     totals = None
     region_map = dict()
+    interval = 0
+    timestamp = 0
 
     # Handle to communicate with dmstats
     _dms = None
+
+    # Optional data logger
+    _logger = None
 
     def _init_bins(self):
         self.bins = []
@@ -622,6 +706,10 @@ class IOScope(object):
             data += "%d:%d\n" % (i, i)
         self.update(data)
 
+    def set_data_logger(self, logger):
+        self._logger = logger
+        self._logger.log_header(self)
+
     def update(self, test=False):
         """ Populate or update the histogram using the string counter
             values in `data`. The current value of the histogram is set
@@ -630,6 +718,10 @@ class IOScope(object):
         """
         if test:
             return self._test_update()
+
+        # update timekeeping fields
+        self.timestamp = time.time()
+        self.interval += 1
 
         data = self._dms.report(fields=self._counters.fields())
 
@@ -651,6 +743,9 @@ class IOScope(object):
             _bin = self.region_map[region]
             self.bins[_bin].count = value
             self.totals[_bin].count += value
+
+        if self._logger:
+            self._logger.log(self)
 
     def min_width(self):
         """ Return width of the smallest bin in this `IOScope`.
@@ -832,6 +927,8 @@ class IOScope(object):
         if not self.adapt:
             return
 
+        changed = False
+
         log_verbose("Updating bin regions (nr_bins=%d)" % self.nr_bins)
         # zip bins, totals, and bounds into a tuple for splitting.
         inbins = zip(self.bins, self.totals, self.bounds, self.regions)
@@ -858,6 +955,7 @@ class IOScope(object):
                 outbins.append((newbin, newtot, newbound, newregion))
 
                 self.nr_bins += 1
+                changed = True
             else:
                 # merge neighbouring bins?
                 mergeable = (len(outbins) and
@@ -894,7 +992,7 @@ class IOScope(object):
                         )
 
                         self.nr_bins -= 1
-
+                        changed = True
                 else:
                     log_verbose("  Keeping region @ %d" % _bin.start)
                     outbins.append(inbin)
@@ -906,6 +1004,9 @@ class IOScope(object):
         self.bounds = list(bounds)
         self.regions = list(regions)
         self.update_region_map()
+
+        if changed and self._logger:
+            self._logger.log_header(self)
 
         log_verbose("Updated bins: %d bins, %d totals, "
                     "%d bounds, %d regions." %
@@ -1013,6 +1114,10 @@ def _parse_options(args):
                         dest="current", default=True,
                         help="Show the current interval plot.")
 
+    parser.add_argument("-f", "--format", action="store", type=str,
+                        dest="format", default=None, help="Specify the format"
+                        " of the output file (if enabled).")
+
     parser.add_argument("-m", "--merge", action="store_true",
                         dest="merge", default=False, help="Allow merging of "
                         "bins with low IO volume in adaptive mode.")
@@ -1021,6 +1126,10 @@ def _parse_options(args):
                         dest="merge_thresh", default=0, help="Threshold at "
                               "which to merge adjacent regions with low IO.",
                         metavar="MERGE_THRESH")
+
+    parser.add_argument("-o", "--output", action="store", type=str,
+                        dest="output", default=None, help="Specify an output"
+                        "file to write histogram data to.")
 
     parser.add_argument("-r", "--rows", action="store", type=int,
                         dest="rows", default=None, help="Specify the maxumum "
@@ -1050,6 +1159,25 @@ def _parse_options(args):
 
 _devices = []
 _histograms = {}
+
+
+def _get_data_logger(output, form):
+    """ Return a `Logger` object for the given `output` and optional
+        `format` suffix, or `None` if no output is given.
+    """
+    if not output:
+        return None
+    return Logger.make_logger(output, form)
+
+
+def _close_logs():
+    """ Close all Logger objects.
+    """
+    for dev in _devices:
+        if dev in _histograms:
+            ios = _histograms[dev]
+            if ios._logger:
+                ios._logger.close()
 
 
 def _remove_all_regions():
@@ -1117,8 +1245,11 @@ def main(argv):
     if not count:
         count = -1
 
+    logger = _get_data_logger(args.output, args.format)
+
     for dev in _devices:
         ioh = IOScope(dev, counters, initial_bins=nr_bins, adapt=adapt)
+        ioh.set_data_logger(logger)
         ioh.create_bin_regions()
         _histograms[dev] = ioh
 
@@ -1155,9 +1286,12 @@ if __name__ == '__main__':
         status = main(sys.argv[1:])
     except KeyboardInterrupt:
         status = 0
+    except LoggerException:
+        status = 1
     except DmStatsException:
         status = 1
     finally:
+        _close_logs()
         _remove_all_regions()
 
     sys.exit(status)
