@@ -124,7 +124,7 @@ def _get_cmd_output(cmd):
         (stdout, stderr) = p.communicate()
     except OSError as e:
         log_error("Could not call '%s': %s" % (args[0], e))
-        raise DmStatsException
+        raise e
 
     if _log_commands or p.returncode != 0:
         log_verbose(stdout.strip())
