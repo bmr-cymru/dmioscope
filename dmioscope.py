@@ -462,12 +462,12 @@ class Bin(object):
 
 _min_size_fraction = 40
 
-# IOHistogram class constants
+# IOScope class constants
 RENDER_COUNTS = 1
 RENDER_TOTALS = 2
 
 
-class IOHistogram(object):
+class IOScope(object):
     """ An IO distribution histogram.
 
         Contains current and running total bins for each region in the
@@ -525,7 +525,7 @@ class IOHistogram(object):
         return bounds
 
     def __init__(self, device, counters, bounds, adapt=True):
-        """ Initialise an `IOHistogram` for `device`, using the sector
+        """ Initialise an `IOScope` for `device`, using the sector
             boundaries listed in `bounds`, and bind it to the dmstats
             counter specified by `counter`.
 
@@ -533,7 +533,7 @@ class IOHistogram(object):
             bin, with an implicit lower bound of 0 on the first. The
             final bin should span all remaining space on the device.
 
-            If `adapt` is True, the `IOHistogram` created will attempt
+            If `adapt` is True, the `IOScope` created will attempt
             to adapt bin count and sizes to the observed IO volumes,
             splitting and merging bins as the bin counts reach user
             specified thresholds.
@@ -544,7 +544,7 @@ class IOHistogram(object):
 
             ```
             bounds = [2048, 4096, 6144, 8192]
-            ioh = IOHistogram("vg00/lvol0", bounds, READS_COUNT, adapt=False)
+            ioh = IOScope("vg00/lvol0", bounds, READS_COUNT, adapt=False)
             ```
 
             Will create a non-adaptive histogram with four bins from
@@ -568,15 +568,15 @@ class IOHistogram(object):
                  % (self._counters, nr_bins, self.min_size))
 
     def __init__(self, device, counters, initial_bins=1, adapt=True):
-        """ Initialise an IOHistogram with `inital_bins` bins, evenly
+        """ Initialise an IOScope with `inital_bins` bins, evenly
             spaced across the specified `device`.
 
             All offsets are in 512b sectors.
 
-            The new IOHistogram is bound to the counter field specified by
+            The new IOScope is bound to the counter field specified by
             counter.
 
-            If `adapt` is True, the `IOHistogram` created will attempt
+            If `adapt` is True, the `IOScope` created will attempt
             to adapt bin count and sizes to the observed IO volumes,
             splitting and merging bins as the bin counts reach user
             specified thresholds.
@@ -584,7 +584,7 @@ class IOHistogram(object):
             For e.g.:
 
             ```
-            ioh = IOHistogram("vg00/lvol0", READS_COUNT, 8, adapt=True);
+            ioh = IOScope("vg00/lvol0", READS_COUNT, 8, adapt=True);
             ```
 
             Will create an adaptive histogram with eight bins and binds
@@ -613,7 +613,7 @@ class IOHistogram(object):
                  % (self._counters, hist_type, nr_bins, self.min_size))
 
     def _test_update(self):
-        """ Generate simple test data to update an `IOHistogram`.
+        """ Generate simple test data to update an `IOScope`.
         """
         data = ""
         for i in range(self.nr_bins):
@@ -651,7 +651,7 @@ class IOHistogram(object):
             self.totals[_bin].count += value
 
     def min_width(self):
-        """ Return width of the smallest bin in this `IOHistogram`.
+        """ Return width of the smallest bin in this `IOScope`.
         """
         return min([_bin.width for _bin in self.bins])
 
@@ -729,7 +729,7 @@ class IOHistogram(object):
         return ((100.0 * size) / self.dev_size)
 
     def print_histogram(self, columns=80, render=RENDER_COUNTS):
-        """ Print an ASCII representation of an `IOHistogram` and its
+        """ Print an ASCII representation of an `IOScope` and its
             values, suitable for display on a terminal of at least
             'colums' width.
 
@@ -814,13 +814,13 @@ class IOHistogram(object):
         print("")
 
     def update_region_map(self):
-        """ Update the map of region_id values to `IOHistogram` bins.
+        """ Update the map of region_id values to `IOScope` bins.
         """
         index = range(len(self.regions))
         self.region_map = dict(zip(self.regions, index))
 
     def update_bin_regions(self, merge=False):
-        """ Update `IOHistogram` bin widths and counts by adapting bins to
+        """ Update `IOScope` bin widths and counts by adapting bins to
             current IO levels. Bins with counts falling above the current
             `_threshold` will be split, and their counts and widths
             distributed. If `merge` is `True` then adjacent bins with both
@@ -925,7 +925,7 @@ class IOHistogram(object):
     def create_bin_regions(self):
         """ Call `dmstats` to create regions on the bound device that
             correspond to the configured bin boundaries for this
-            `IOHistogram`.
+            `IOScope`.
 
             Returns nothing on success and raises `DmStatsException` on
             error.
@@ -945,7 +945,7 @@ class IOHistogram(object):
         return self._dms.delete(region_id)
 
     def remove_bin_regions(self):
-        """ Remove all regions managed by this `IOHistogram` from the
+        """ Remove all regions managed by this `IOScope` from the
             bound device.
         """
         for region in self.regions:
@@ -1051,7 +1051,7 @@ _histograms = {}
 
 
 def _remove_all_regions():
-    """ Remove all regions for all `IOHistogram` objects in `_histograms`.
+    """ Remove all regions for all `IOScope` objects in `_histograms`.
     """
     for dev in _devices:
         if dev in _histograms:
@@ -1112,7 +1112,7 @@ def main(argv):
         count = -1
 
     for dev in _devices:
-        ioh = IOHistogram(dev, counters, initial_bins=nr_bins, adapt=adapt)
+        ioh = IOScope(dev, counters, initial_bins=nr_bins, adapt=adapt)
         ioh.create_bin_regions()
         _histograms[dev] = ioh
 
