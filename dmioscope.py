@@ -601,7 +601,7 @@ class JSONLogger(Logger):
         self.jts["recordCount"] = "%d" % nr_data
 
         json_data = json.dumps(self.jts, indent=2)
-        log_error("writing JTS object: %s" % json_data)
+        log_verbose("writing JTS object: %s" % json_data)
 
         self._write(json_data)
         self.in_object = False
