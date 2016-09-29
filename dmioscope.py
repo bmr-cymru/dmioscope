@@ -450,8 +450,8 @@ DOT = os.extsep
 
 class Logger(object):
     """ Abstract class representing a data logger.
-        Logger implementations should implement the `log_header`, `log`,
-        and 'close', instance methods, and 'probe' class method.
+        Logger implementations should implement the `log_header` and `log`,
+        instance methods, and 'probe' class method.
 
         The `probe` method must return `True` when its `ext` argument
         matches the expected file extension for the format type.
@@ -468,11 +468,15 @@ class Logger(object):
     """
 
     output = None
+    file = None
 
     def __init__(self, output):
-        """ Initialise a Logger object.
-        """
-        raise LoggerException("Attempt to construct abstract Logger class.")
+        self.output = output
+        try:
+            self.file = open(output, "w")
+        except Exception as e:
+            raise LoggerException("Could not open %s for writing: %s" %
+                                  (output, e))
 
     def log_header(self, ios):
         """ Log a header for the given `IOScope`.
@@ -485,10 +489,25 @@ class Logger(object):
         raise LoggerException("Attempt to log to abstract Logger class.")
 
     def close(self):
-        raise LoggerException("Attempt to close abstract Logger class.")
+        """ Close files and release resources associated with this Logger.
+        """
+        try:
+            self.file.close()
+        except Exception as e:
+            raise LoggerException("Error closing %s: %s" % (self.output, e))
 
+    @classmethod
     def probe(self, ext):
         raise LoggerException("Attempt to probe abstract Logger class.")
+
+    def _write(self, data):
+        """ Helper method to write data to the Logger object's file.
+        """
+        try:
+            self.file.write(data + "\n")
+            self.file.flush()
+        except Exception as e:
+            raise LoggerException("Error writing to %s: %s" % (self.output, e))
 
     @classmethod
     def make_logger(self, output, form):
@@ -513,25 +532,10 @@ class CSVLogger(Logger):
     """ A `Logger` class to write CSV formatted data.
     """
 
-    def __init__(self, output):
-        self.output = output
-        try:
-            self.file = open(output, "w")
-        except Exception as e:
-            raise LoggerException("Could not open %s for writing: %s" %
-                                  (output, e))
-
     def _meta(self, ios):
         """ Return formatted meta fields ready to be written.
         """
         return [str(ios.interval), str(ios.timestamp), ios.device]
-
-    def _write(self, data):
-        try:
-            self.file.write(data + "\n")
-            self.file.flush()
-        except Exception as e:
-            raise LoggerException("Error writing to %s: %s" % (self.output, e))
 
     def log_header(self, ios):
         """ Log a CSV header for the given `IOScope`.
@@ -549,14 +553,6 @@ class CSVLogger(Logger):
         data_points = [str(_bin.count) for _bin in ios.bins]
         data = ",".join(meta_points + data_points)
         self._write(data)
-
-    def close(self):
-        """ Close files and release resources associated with this Logger.
-        """
-        try:
-            self.file.close()
-        except Exception as e:
-            raise LoggerException("Error closing %s: %s" % (self.output, e))
 
     @classmethod
     def probe(self, ext):
