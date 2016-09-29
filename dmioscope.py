@@ -69,6 +69,8 @@ import time
 import fcntl
 import struct
 import termios
+import datetime
+import json
 
 CLEAR_SCREEN = "\033c"
 
@@ -558,6 +560,79 @@ class CSVLogger(Logger):
     def probe(self, ext):
         return ext.lower() == "csv"
 
+
+class JSONLogger(Logger):
+    """ A `Logger` class to write JSON formatted data.
+    """
+
+    # JSON Time Series object
+    # Since writing a correct header requires the timestamp of the last
+    # entry, and the number of entries, for now build the object in-memory,
+    # and encode and write it to the file at `close()` time.
+    in_object = False
+    jts = None
+
+    def _jts_init(self, ios):
+        log_error("Initialising JTS object.")
+        jts = {"docType": "jts", "version": "1.0"}
+        jts["columns"] = {}
+        jts["data"] = []
+        bindex = 0
+        for _bin in ios.bins:
+            jts["columns"]["%d" % bindex] = {
+                "id": "f1xm3a129bc9b4035f906d7%d" % bindex,  # FIXME
+                "name": "%d" % _bin.width,
+                "dataType": "NUMBER",
+                "renderType": "VALUE",
+                "format": "0"
+            }
+            bindex += 1
+
+        self.in_object = True
+
+        return jts
+
+    def _write_json(self):
+        nr_data = len(self.jts['data'])
+
+        # Finish header fields
+        self.jts["startTime"] = self.jts['data'][0]["ts"]
+        self.jts["endTime"] = self.jts['data'][-1]["ts"]
+        self.jts["recordCount"] = "%d" % nr_data
+
+        json_data = json.dumps(self.jts, indent=2)
+        log_error("writing JTS object: %s" % json_data)
+
+        self._write(json_data)
+        self.in_object = False
+
+    def log_header(self, ios):
+        """ Log a JSON header for the given `IOScope`.
+        """
+        if self.in_object:
+            self._write_json()
+
+        self.jts = self._jts_init(ios)
+
+    def log(self, ios):
+        """ Log a set of data points in JSON format for the given `IOScope`.
+        """
+        dt = datetime.datetime.today()  # FIXME: use better dmstats ts data
+        ts = dt.isoformat()
+        bindex = 0
+
+        self.jts["data"].append({"ts": ts})
+        self.jts["data"][-1]["f"] = {}
+        for _bin in ios.bins:
+            # bindex'th bin in "f" of the last data set
+            self.jts['data'][-1]["f"]["%d" % bindex] = {
+                "v": _bin.count
+            }
+            bindex += 1
+
+    @classmethod
+    def probe(self, ext):
+        return ext.lower() == "json"
 
 _loggers = [CSVLogger, JSONLogger]
 
