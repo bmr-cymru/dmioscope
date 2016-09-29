@@ -13,12 +13,11 @@
 # along with this program; if not, write to the Free Software Foundation,
 # Inc., 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA
 #
-# Usage:
-#
-#  dmioscope.py [-h] [-a] [-b NR_BINS] [--clear] [-C COUNTERS] [-c] [-m]
-#                      [-M MERGE_THRESH] [-n] [-r ROWS] [-s] [-t THRESH] [-v]
-#                      [-w WIDTH]
-#                      [interval] [count] dev [dev ...]
+#  usage: dmioscope.py [-h] [-a | -n] [-b NR_BINS] [--clear]
+#                      [-C COUNTERS] [-c] [-f FORMAT] [-m]
+#                      [-M MERGE_THRESH] [-o OUTPUT] [-r ROWS] [-s]
+#                      [-t THRESH] [-v] [-V] [-w WIDTH]
+#                      [interval] [count] [dev [dev ...]]
 #
 #  IOScope arguments.
 #
@@ -29,30 +28,38 @@
 #
 #  optional arguments:
 #    -h, --help            show this help message and exit
-#    -a, --adaptive        Adapt the number of bins to observed IO volume.
+#    -a, --adaptive        Adapt the number of bins to observed IO
+#                          volume.
+#    -n, --no-adaptive     Do not adapt the number of bins according to
+#                          observed IO volume.
 #    -b NR_BINS, --bins NR_BINS
 #                          Divide devices into nr equally sized bins.
 #    --clear               Clear the screen before each update.
 #    -C COUNTERS, --counters COUNTERS
 #                          Specify the dmstats counter fields to monitor
-#                          (QUEUE_TICKS, READ_TICKS, READS_MERGED, WRITE_TIME,
-#                          IN_PROGRESS, READ_SECTORS, WRITE_TICKS,
-#                          WRITES_MERGES, WRITES, WRITE_SECTORS, READ_TIME,
-#                          READS, IO_TICKS)
+#                          (QUEUE_TICKS, READ_TICKS, READS_MERGED,
+#                          WRITE_TIME, IN_PROGRESS, READ_SECTORS,
+#                          WRITE_TICKS, WRITES_MERGES, WRITES,
+#                          WRITE_SECTORS, READ_TIME, READS, IO_TICKS)
 #    -c, --current         Show the current interval plot.
-#    -m, --merge           Allow merging of bins with low IO volume in adaptive
-#                          mode.
+#    -f FORMAT, --format FORMAT
+#                          Specify the format of the output file (if
+#                          enabled).
+#    -m, --merge           Allow merging of bins with low IO volume in
+#                          adaptive mode.
 #    -M MERGE_THRESH, --merge-threshold MERGE_THRESH
-#                          Threshold at which to merge adjacent regions with
-#                          low IO.
-#    -n, --no-adaptive     Do not adapt the number of bins according to
-#                          observed IO volume.
+#                          Threshold at which to merge adjacent regions
+#                          with low IO.
+#    -o OUTPUT, --output OUTPUT
+#                          Specify an outputfile to write histogram data
+#                          to.
 #    -r ROWS, --rows ROWS  Specify the maxumum number of rows to use.
 #    -s, --summary         Show the accumulated summary plot.
 #    -t THRESH, --threshold THRESH
 #                          Threshold at which to split a bin when using
 #                          --adaptive
 #    -v, --verbose         Enable verbose debugging messages.
+#    -V, --version         Print version information and exit.
 #    -w WIDTH, --width WIDTH
 #                          Specify the maximum terminal width to use.
 #
