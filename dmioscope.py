@@ -232,7 +232,11 @@ class DmStats(object):
 
         self._status("Could not create region on device %s" % self.device)
 
-        region_id = int(out.strip().split()[-1])
+        try:
+            region_id = int(out.strip().split()[-1])
+        except:
+            log_error("Malformed output from 'dmstats create': %s" % out)
+            raise DmStatsException
 
         log_verbose("Created region_id %d @ %d length=%d)" %
                     (region_id, start, length))
@@ -342,9 +346,14 @@ class DmStatsCounters(object):
             the default (':') field delimiter, and with the field
             specification returned by this object's `fields()` method.
         """
-        fields = data.split(":")
-        region = int(fields[0])
-        counters = map(int, fields[1:])
+        try:
+            fields = data.split(":")
+            region = int(fields[0])
+            counters = map(int, fields[1:])
+        except:
+            log_error("Malformed data in report: %s" % data)
+            raise DmStatsException
+
         return (region, sum(counters))
 
 
