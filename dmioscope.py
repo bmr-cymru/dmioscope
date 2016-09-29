@@ -79,6 +79,7 @@ _version_major = 0
 _version_minor = 1
 _version_str = "%d.%d" % (_version_major, _version_minor)
 
+
 def log_info(msg):
     print(msg)
 
@@ -1058,9 +1059,13 @@ def _remove_all_regions():
         if dev in _histograms:
             _histograms[dev].remove_bin_regions()
 
+
 def _version():
+    """ Print the current version.
+    """
     log_info("DM IOScope version: %s" % _version_str)
     return 0
+
 
 def main(argv):
     """ Main `dmioscope` routine.
