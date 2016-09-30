@@ -527,8 +527,7 @@ class Logger(object):
         """ Helper method to write data to the Logger object's file.
         """
         try:
-            self.file.write(data + "\n")
-            self.file.flush()
+            self.file.write(data)
         except Exception as e:
             raise LoggerException("Error writing to %s: %s" % (self.output, e))
 
@@ -567,7 +566,7 @@ class CSVLogger(Logger):
         data_points = [str(_bin.width) for _bin in ios.bins]
         null_points = ["0" for n in range(ios.nr_bins)]
         data = ",".join(meta_points + null_points + data_points)
-        self._write(data)
+        self._write(data + "\n")
 
     def log(self, ios):
         """ Log a set of data points in CSV format for the given `IOScope`.
@@ -575,7 +574,7 @@ class CSVLogger(Logger):
         meta_points = self._meta(ios)
         data_points = [str(_bin.count) for _bin in ios.bins]
         data = ",".join(meta_points + data_points)
-        self._write(data)
+        self._write(data + "\n")
 
     @classmethod
     def probe(self, ext):
