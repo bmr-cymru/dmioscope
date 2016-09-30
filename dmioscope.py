@@ -605,7 +605,8 @@ class JSONLogger(Logger):
                 "name": "%d" % _bin.width,
                 "dataType": "NUMBER",
                 "renderType": "VALUE",
-                "format": "0"
+                "format": "0",
+                "aggregate": "NONE"
             }
             bindex += 1
 
