@@ -583,14 +583,29 @@ class CSVLogger(Logger):
 
 class JSONLogger(Logger):
     """ A `Logger` class to write JSON formatted data.
+
+        Data is encoded using the JSON Time Series 1.0 specification:
+
+            http://eagleio.readthedocs.io/en/latest/reference/historic/jts.htm
+
+        Since the number of columns, and their properties, may change due to
+        histogram adaptation, the file is written as an array of JTS objects,
+        with successive indexes corresponding to later sets of sample data.
     """
 
     # JSON Time Series object
     # Since writing a correct header requires the timestamp of the last
     # entry, and the number of entries, for now build the object in-memory,
     # and encode and write it to the file at `close()` time.
-    in_object = False
     jts = None
+
+    in_object = False
+    nr_logged = 0
+
+    def __init__(self, output):
+        super(JSONLogger, self).__init__(output)
+        # Open the JST container array.
+        self._write("[")
 
     def _jts_init(self, ios):
         log_error("Initialising JTS object.")
@@ -616,16 +631,27 @@ class JSONLogger(Logger):
     def _write_json(self):
         nr_data = len(self.jts['data'])
 
+        # New JTS object with no data: nothing to write.
+        if not nr_data:
+            return
+
+        # Start new JTS container array member.
+        if self.nr_logged:
+            self._write(",")
+
         # Finish header fields
         self.jts["startTime"] = self.jts['data'][0]["ts"]
         self.jts["endTime"] = self.jts['data'][-1]["ts"]
+
         self.jts["recordCount"] = "%d" % nr_data
 
-        json_data = json.dumps(self.jts, indent=2)
+        json_data = json.dumps(self.jts)
         log_verbose("writing JTS object: %s" % json_data)
 
         self._write(json_data)
+
         self.in_object = False
+        self.nr_logged += 1
 
     def log_header(self, ios):
         """ Log a JSON header for the given `IOScope`.
@@ -650,6 +676,14 @@ class JSONLogger(Logger):
                 "v": _bin.count
             }
             bindex += 1
+
+    def close(self):
+        # Write any open JST object.
+        if self.in_object:
+            self._write_json()
+        # Close the JST container array.
+        self._write("]")
+        super(JSONLogger, self).close()
 
     @classmethod
     def probe(self, ext):
