@@ -536,7 +536,13 @@ class Logger(object):
         """ Build a logger object for the specified output file and format.
             If `output` does not include a format extension one must be
             provided in the `form` argument.
+
+            If no output file was specified, return a `NullLogger` object which
+            logs data using `log_verbose()`.
         """
+        if not output:
+            return NullLogger(output)
+
         if DOT not in output:
             extension = form
         else:
@@ -548,6 +554,46 @@ class Logger(object):
         for logger in _loggers:
             if logger.probe(extension):
                 return logger(output)
+
+
+class NullLogger(Logger):
+    """ A `Logger` class that logs data to the stdio log stream.
+    """
+
+    def __init__(self, output):
+        """ Construct a NullLogger object without opening a file.
+        """
+        if output and output != "-":
+            raise LoggerException("NULL logger can only write to stdout.")
+
+        log_verbose("NULL logger logging to stdout.")
+
+    def log_header(self, ios):
+        """ Log the header values in python variable notation.
+        """
+        data_points = [str(_bin.width) for _bin in ios.bins]
+        log_verbose("interval=%d" % ios.interval)
+        log_verbose("timestamp=%f" % ios.timestamp)
+        log_verbose("nr_bins=%d" % ios.nr_bins)
+        log_verbose("widths=[" + ",".join(data_points) + "]")
+
+    def log(self, ios):
+        """ Log a row of histogram values in python list notation.
+        """
+        data_points = [str(_bin.count) for _bin in ios.bins]
+        log_verbose("data=[" + ",".join(data_points) + "]")
+
+    def close(self):
+        """ Closing a `NullLogger` is a noop.
+        """
+        log_verbose("Closing NULL logger.")
+        pass
+
+    @classmethod
+    def probe(self):
+        """ The `NullLogger` class does not correspond to a file extension.
+        """
+        return False
 
 
 class CSVLogger(Logger):
@@ -924,8 +970,7 @@ class IOScope(object):
             self.bins[_bin].count = value
             self.totals[_bin].count += value
 
-        if self._logger:
-            self._logger.log(self)
+        self._logger.log(self)
 
     def min_width(self):
         """ Return width of the smallest bin in this `IOScope`.
@@ -1185,7 +1230,7 @@ class IOScope(object):
         self.regions = list(regions)
         self.update_region_map()
 
-        if changed and self._logger:
+        if changed:
             self._logger.log_header(self)
 
         log_verbose("Updated bins: %d bins, %d totals, "
@@ -1236,7 +1281,7 @@ class IOScope(object):
         self.regions = []
 
 
-_log_commands = True
+_log_commands = False
 
 
 # threshold at which to split a bin in two.
@@ -1345,8 +1390,6 @@ def _get_data_logger(output, form):
     """ Return a `Logger` object for the given `output` and optional
         `format` suffix, or `None` if no output is given.
     """
-    if not output:
-        return None
     return Logger.make_logger(output, form)
 
 
