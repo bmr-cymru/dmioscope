@@ -176,11 +176,13 @@ class DmStats(object):
     minor = -1
 
     # command state
+    program_id = None
     verb = None
     args = None
     status = 0
 
-    def __init__(self, device, uuid=None, major=None, minor=None):
+    def __init__(self, device, uuid=None, major=None, minor=None,
+                 program_id=None):
         """ Initialise a `DmStats` object and bind it to the specified
             DM device name, UUID, or major/minor pair. An error is logged
             and a DmStatsException raised if the device does not exist.
@@ -203,6 +205,8 @@ class DmStats(object):
             log_error("device %s does not exist" % device)
             raise DmStatsException
 
+        self.program_id = program_id
+
         # canonical dm name
         self.device = result[1].strip()
 
@@ -211,7 +215,12 @@ class DmStats(object):
             the combined output as a string. The exit status is stored in
             `status`. Called by command methods.
         """
-        cmdstr = "%s %s %s" % (DMSTATS, self.verb, self.args)
+        if self.program_id:
+            idstr = "%s %s" % ("--programid", self.program_id)
+            cmdstr = "%s %s %s %s" % (DMSTATS, self.verb, idstr, self.args)
+        else:
+            cmdstr = "%s %s %s" % (DMSTATS, self.verb, self.args)
+
         result = _get_cmd_output(cmdstr.strip())
         self.status = result[0]
         return result[1]
@@ -863,7 +872,7 @@ class IOScope(object):
             0..1M, 1M..2M,2M..3M, and 3M..4M, tracking the READS_COUNT
             counter.
         """
-        self._dms = DmStats(device)
+        self._dms = DmStats(device, program_id="dmioscope")
         self._counters = DmStatsCounters(counters)
         self.device = device
         self.bounds = bounds
@@ -902,7 +911,7 @@ class IOScope(object):
             Will create an adaptive histogram with eight bins and binds
             it to the READS_COUNT counter.
         """
-        self._dms = DmStats(device)
+        self._dms = DmStats(device, program_id="dmioscope")
         self._counters = DmStatsCounters(counters)
         self.device = device
 
