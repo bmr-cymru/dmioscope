@@ -70,6 +70,7 @@ import argparse
 import shlex
 import sys
 import os
+import shutil
 import errno
 import math
 import time
@@ -1430,6 +1431,11 @@ def _version():
 def main(argv):
     """ Main `dmioscope` routine.
     """
+    # verify required external commands
+    for prog in (DMSETUP, DMSTATS):
+        if shutil.which(prog) is None:
+            log_error("Required program '%s' not found in PATH." % prog)
+            return 1
     global _devices, _histograms, _merge_threshold, _threshold, _verbose
 
     args = _parse_options(argv)
