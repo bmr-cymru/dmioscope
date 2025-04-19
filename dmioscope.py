@@ -208,7 +208,7 @@ class DmStats(object):
         self.program_id = program_id
 
         # canonical dm name
-        self.device = result[1].strip()
+        self.device = result[1].strip().decode('utf8')
 
     def _issue_command(self):
         """ Issue the command configured in `verb` and `args`, and return
@@ -1248,7 +1248,7 @@ class IOScope(object):
                      len(self.bounds), len(self.regions)))
 
         out = self._dms.list()
-        log_verbose(out)
+        log_verbose(out.decode('utf8'))
 
     def _create_bin_region(self, start, length):
         """ Call `dmstats` to create a new region on the bound device,
