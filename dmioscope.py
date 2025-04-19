@@ -1491,15 +1491,14 @@ def main(argv):
         ioh.create_bin_regions()
         _histograms[dev] = ioh
 
-    start_time = time.time()
+    # Use monotonic clock to avoid issues if system time changes
+    start_time = time.monotonic()
 
     while count:
-        # Sleep at the top of the interval to accumulate some initial
-        # data to display. Since there's no direct way to access the
-        # timerfd_create() or setitimer() interfaces from python use
-        # a simple sleep() but correct the actual duration for each
-        # interval based on the accumulated error.
-        time.sleep(interval - ((time.time() - start_time) % interval))
+        # Sleep at the top of the interval. Correct for drift using monotonic clock.
+        delay = interval - ((time.monotonic() - start_time) % interval)
+        if delay > 0:
+            time.sleep(delay)
 
         if clear:
             print(CLEAR_SCREEN)
